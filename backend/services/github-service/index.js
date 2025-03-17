@@ -13,6 +13,10 @@ app.get("/app-details", async (req, res) => {
     }
 });
 
+app.get("/test", (req, res) => {
+    res.send("GitHub Service is working!");
+});
+
 app.get("/repos/:username", async (req, res) => {
     try {
         const { username } = req.params;
