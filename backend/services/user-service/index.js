@@ -1,27 +1,21 @@
 const express = require("express");
 const mongoose = require("mongoose");
-const dotenv = require("dotenv");
+const userRoutes = require("./routes/userRoutes"); // Ensure this file exists
 
-const userRoutes = require("./routes/userRoutes");
-
-dotenv.config();
 const app = express();
+const PORT = 5002;
 
-app.use(express.json());
+app.use(express.json()); // Parse JSON request body
+app.use("/users", userRoutes); // Correctly mounting the router
 
-// Routes
-app.use("/users", userRoutes);
+mongoose
+  .connect("mongodb://localhost:27017/github-analytics", {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log("Connected to MongoDB"))
+  .catch((err) => console.error("MongoDB connection error:", err));
 
-app.get('/test', (req, res) => {
-    res.send("User Service is working!");
-});
-
-// MongoDB Connection
-mongoose.connect(process.env.MONGO_URI, {})
-    .then(() => console.log("Connected to MongoDB"))
-    .catch(err => console.error("MongoDB Connection Error:", err));
-
-const PORT = process.env.PORT || 5002;
 app.listen(PORT, () => {
-    console.log(`User Service is running on port ${PORT}`);
+  console.log(`User Service is running on port ${PORT}`);
 });
