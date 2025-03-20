@@ -3,7 +3,7 @@ const axios = require("axios");
 require("dotenv").config();
 
 const app = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 5001;
 
 const GITHUB_API = "https://api.github.com";
 const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
@@ -47,6 +47,27 @@ const saveUserToUserService = async (userData) => {
   }
 };
 
+const saveRepoToRepoService = async (repoData, ownerGithubId) => {
+  try {
+    const response = await axios.post("http://localhost:5003/repos", {
+      githubId: repoData.id,
+      name: repoData.name,
+      owner: ownerGithubId, // Use the user's githubId
+      fullName: repoData.full_name,
+      description: repoData.description,
+      url: repoData.html_url,
+      createdAt: repoData.created_at,
+      updatedAt: repoData.updated_at,
+      openIssuesCount: repoData.open_issues_count,
+      forksCount: repoData.forks_count,
+      starsCount: repoData.stargazers_count,
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(`Failed to save repo: ${error.message}`);
+  }
+};
+
 app.get("/users/:username", async (req, res) => {
   try {
     const { username } = req.params;
@@ -62,9 +83,13 @@ app.get("/repos/:username", async (req, res) => {
   try {
     const { username } = req.params;
     const repos = await getUserRepositories(username);
-    res.json(repos);
+    const userData = await getGitHubUser(username); // Get user to grab githubId
+    const savedRepos = await Promise.all(
+      repos.map((repo) => saveRepoToRepoService(repo, userData.id.toString()))
+    );
+    res.json(savedRepos);
   } catch (error) {
-    res.status(500).json({ error: "Failed to fetch repositories" });
+    res.status(500).json({ error: error.message });
   }
 });
 
