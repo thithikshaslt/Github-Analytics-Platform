@@ -1,15 +1,18 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const userRoutes = require("./routes/userRoutes"); 
+require("dotenv").config(); // Add this to load .env variables
 
 const app = express();
-const PORT = 5002;
+const PORT = process.env.PORT;
 
 app.use(express.json());
 app.use("/users", userRoutes); 
 
+const ATLAS_URI = process.env.MONGO_URI;
+
 mongoose
-  .connect("mongodb://localhost:27017/github-analytics", {
+  .connect(ATLAS_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })

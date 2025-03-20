@@ -4,13 +4,11 @@ const { createProxyMiddleware } = require("http-proxy-middleware");
 const app = express();
 const PORT = 5000; // API Gateway port
 
-// Middleware to log all incoming requests
 app.use((req, res, next) => {
     console.log(`Incoming Request: ${req.method} ${req.url}`);
     next();
 });
 
-// Proxy User Service with FIXED path rewrite
 app.use(
     "/users",
     (req, res, next) => {
