@@ -4,7 +4,7 @@ const userRoutes = require("./routes/userRoutes");
 require("dotenv").config(); // Add this to load .env variables
 
 const app = express();
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 5002;
 
 app.use(express.json());
 app.use("/users", userRoutes); 
