@@ -30,6 +30,17 @@ const getUserRepositories = async (username) => {
   }
 };
 
+const getRepoCommits = async (owner, repo) => {
+  try {
+    const response = await axios.get(`${GITHUB_API}/repos/${owner}/${repo}/commits`, {
+      headers: GITHUB_TOKEN ? { Authorization: `token ${GITHUB_TOKEN}` } : {},
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(`Failed to fetch commits: ${error.message}`);
+  }
+};
+
 const saveUserToUserService = async (userData) => {
   try {
     const response = await axios.post("http://localhost:5002/users", {
@@ -52,7 +63,7 @@ const saveRepoToRepoService = async (repoData, ownerGithubId) => {
     const response = await axios.post("http://localhost:5003/repos", {
       githubId: repoData.id,
       name: repoData.name,
-      owner: ownerGithubId, // Use the user's githubId
+      owner: ownerGithubId,
       fullName: repoData.full_name,
       description: repoData.description,
       url: repoData.html_url,
@@ -61,10 +72,27 @@ const saveRepoToRepoService = async (repoData, ownerGithubId) => {
       openIssuesCount: repoData.open_issues_count,
       forksCount: repoData.forks_count,
       starsCount: repoData.stargazers_count,
+      upsert: true,
     });
     return response.data;
   } catch (error) {
     throw new Error(`Failed to save repo: ${error.message}`);
+  }
+};
+
+const saveCommitToCommitService = async (commitData, repoGithubId) => {
+  try {
+    const response = await axios.post("http://localhost:5004/commits", {
+      sha: commitData.sha,
+      repository: repoGithubId.toString(),
+      author: commitData.author ? commitData.author.id.toString() : commitData.commit.author.name,
+      message: commitData.commit.message,
+      date: commitData.commit.author.date,
+      upsert: true, // Add upsert flag for commits
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(`Failed to save commit: ${error.message}`);
   }
 };
 
@@ -83,11 +111,28 @@ app.get("/repos/:username", async (req, res) => {
   try {
     const { username } = req.params;
     const repos = await getUserRepositories(username);
-    const userData = await getGitHubUser(username); // Get user to grab githubId
+    const userData = await getGitHubUser(username);
     const savedRepos = await Promise.all(
       repos.map((repo) => saveRepoToRepoService(repo, userData.id.toString()))
     );
     res.json(savedRepos);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/commits/:owner/:repo", async (req, res) => {
+  try {
+    const { owner, repo } = req.params;
+    const commits = await getRepoCommits(owner, repo);
+    const repoResponse = await axios.get(`http://localhost:5003/repos?fullName=${owner}/${repo}`);
+    const repoGithubId = repoResponse.data[0]?.githubId;
+    if (!repoGithubId) throw new Error("Repository not found in Repository Service");
+
+    const savedCommits = await Promise.all(
+      commits.map((commit) => saveCommitToCommitService(commit, repoGithubId))
+    );
+    res.json(savedCommits);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
