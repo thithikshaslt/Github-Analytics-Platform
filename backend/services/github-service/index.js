@@ -41,6 +41,17 @@ const getRepoCommits = async (owner, repo) => {
   }
 };
 
+const getRepoPullRequests = async (owner, repo) => {
+  try {
+    const response = await axios.get(`${GITHUB_API}/repos/${owner}/${repo}/pulls?state=all&per_page=10`, {
+      headers: GITHUB_TOKEN ? { Authorization: `token ${GITHUB_TOKEN}` } : {},
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(`Failed to fetch pull requests: ${error.message}`);
+  }
+};
+
 const saveUserToUserService = async (userData) => {
   try {
     const response = await axios.post("http://localhost:5002/users", {
@@ -88,11 +99,31 @@ const saveCommitToCommitService = async (commitData, repoGithubId) => {
       author: commitData.author ? commitData.author.id.toString() : commitData.commit.author.name,
       message: commitData.commit.message,
       date: commitData.commit.author.date,
-      upsert: true, // Add upsert flag for commits
+      upsert: true,
     });
     return response.data;
   } catch (error) {
     throw new Error(`Failed to save commit: ${error.message}`);
+  }
+};
+
+const savePullToPullService = async (pullData, repoGithubId) => {
+  try {
+    const response = await axios.post("http://localhost:5005/pulls", {
+      githubId: pullData.id,
+      repository: repoGithubId.toString(),
+      title: pullData.title,
+      number: pullData.number,
+      state: pullData.state === "closed" && pullData.merged_at ? "merged" : pullData.state,
+      createdAt: pullData.created_at,
+      mergedAt: pullData.merged_at,
+      closedAt: pullData.closed_at,
+      author: pullData.user.id.toString(),
+      upsert: true,
+    });
+    return response.data;
+  } catch (error) {
+    throw new Error(`Failed to save pull request: ${error.message}`);
   }
 };
 
@@ -133,6 +164,23 @@ app.get("/commits/:owner/:repo", async (req, res) => {
       commits.map((commit) => saveCommitToCommitService(commit, repoGithubId))
     );
     res.json(savedCommits);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get("/pulls/:owner/:repo", async (req, res) => {
+  try {
+    const { owner, repo } = req.params;
+    const pulls = await getRepoPullRequests(owner, repo);
+    const repoResponse = await axios.get(`http://localhost:5003/repos?fullName=${owner}/${repo}`);
+    const repoGithubId = repoResponse.data[0]?.githubId;
+    if (!repoGithubId) throw new Error("Repository not found in Repository Service");
+
+    const savedPulls = await Promise.all(
+      pulls.map((pull) => savePullToPullService(pull, repoGithubId))
+    );
+    res.json(savedPulls);
   } catch (error) {
     res.status(500).json({ error: error.message });
   }
