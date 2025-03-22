@@ -1,7 +1,10 @@
 const express = require("express");
 const { createProxyMiddleware } = require("http-proxy-middleware");
+const cors = require("cors"); // Added for CORS
 
 const app = express();
+app.use(cors({ origin: "http://localhost:5173" })); // Added to allow frontend requests
+
 const PORT = 5000; // API Gateway port
 
 app.use((req, res, next) => {
