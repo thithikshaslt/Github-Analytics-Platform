@@ -6,7 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 function Insights() {
   const { username } = useParams();
   const [user, setUser] = useState(null);
-  const [repos, setRepos] = useState([]);
+  const [repos, setRepos] = useState([]); // Full repo list
   const [commits, setCommits] = useState(null);
   const [error, setError] = useState(null);
 
@@ -15,7 +15,7 @@ function Insights() {
       .then(([userResponse, reposResponse, commitsResponse]) => {
         console.log("User Data:", userResponse.data);
         setUser(userResponse.data);
-        setRepos(reposResponse.data);
+        setRepos(reposResponse.data); // Keep full array
         setCommits(commitsResponse.data);
       })
       .catch((err) => {
@@ -25,11 +25,11 @@ function Insights() {
   }, [username]);
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6 w-full"> {/* Added w-full */}
+    <div className="min-h-screen bg-gray-100 p-6 w-full">
       <h1 className="text-3xl text-gray-900 mb-6">Insights for {username}</h1>
       {error && <p className="text-red-500 mb-4">Error: {error}</p>}
       {user ? (
-        <Card className="w-full max-w-2xl mx-auto"> {/* Changed max-w-md to max-w-2xl */}
+        <Card className="w-full max-w-2xl mx-auto">
           <CardHeader>
             <div className="flex items-center space-x-4">
               {user.avatarUrl ? (
@@ -48,16 +48,40 @@ function Insights() {
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-700">{user.bio || 'No bio available'}</p>
-            <p className="mt-2 text-gray-600">Repositories: {repos.length}</p>
-            <p className="mt-2 text-gray-600">
-              Commits: {commits ? commits.totalCommits : 'Loading...'}
-            </p>
-            <p className="mt-2 text-gray-600">PRs: Coming soon</p>
+            <p className="text-gray-700 mb-4">{user.bio || 'No bio available'}</p>
+            <div className="space-y-2">
+              <p className="text-gray-600">Repositories: {repos.length} total</p> {/* Full count */}
+              {repos.length > 0 && (
+                <div>
+                  <p className="text-gray-600 font-semibold">Top Repositories:</p>
+                  <ul className="list-disc list-inside text-gray-600">
+                    {repos.slice(0, 3).map((repo) => ( // Slice here for display
+                      <li key={repo.githubId || repo.name}>
+                        <a
+                          href={repo.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-500 hover:underline"
+                        >
+                          {repo.name}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+              <p className="text-gray-600">
+                Commits: {commits ? commits.totalCommits : 'Loading...'}
+              </p>
+              <p className="text-gray-600">PRs: Coming soon</p>
+            </div>
           </CardContent>
         </Card>
       ) : (
-        <p className="text-gray-900">Loading...</p>
+        <div className="flex items-center justify-center min-h-[200px]">
+          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <span className="ml-2 text-gray-900">Loading...</span>
+        </div>
       )}
     </div>
   );
