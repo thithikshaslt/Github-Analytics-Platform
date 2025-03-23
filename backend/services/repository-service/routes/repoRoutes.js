@@ -1,8 +1,14 @@
 const express = require("express");
 const axios = require("axios");
 const Repository = require("../models/Repository");
-
+require("dotenv").config(); // Add this
 const router = express.Router();
+
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "YOUR_GITHUB_TOKEN_HERE"; // Add to .env
+const githubApi = axios.create({
+  baseURL: "https://api.github.com",
+  headers: GITHUB_TOKEN ? { Authorization: `token ${GITHUB_TOKEN}` } : {},
+});
 
 // Get all repositories
 router.get("/", async (req, res) => {
@@ -16,47 +22,79 @@ router.get("/", async (req, res) => {
   }
 });
 
-// Get repositories for a specific user
+// Get and sync ALL repositories for a specific user
 router.get("/:username", async (req, res) => {
   try {
     const { username } = req.params;
-    console.log(`Fetching repos for user: ${username}`);
+    console.log(`Fetching ALL repos for user: ${username}`);
 
-    // Check MongoDB for user's repos
-    const repos = await Repository.find({ owner: username });
-    if (repos.length > 0) {
-      console.log(`Found ${repos.length} repos in DB for ${username}`);
-      res.json(repos);
-    } else {
-      // Fallback to GitHub API if no data in DB
-      console.log(`No repos in DB, fetching from GitHub for ${username}`);
-      const response = await axios.get(`https://api.github.com/users/${username}/repos`);
-      const githubRepos = response.data.map(repo => ({
+    // Fetch all repos from GitHub with pagination
+    let allGithubRepos = [];
+    let page = 1;
+    const perPage = 100; // Max allowed by GitHub API
+
+    while (true) {
+      const response = await githubApi.get(`/users/${username}/repos`, {
+        params: {
+          per_page: perPage,
+          page: page,
+        },
+      });
+      const reposPage = response.data;
+
+      if (reposPage.length === 0) break; // No more repos, exit loop
+
+      const mappedRepos = reposPage.map(repo => ({
         githubId: repo.id.toString(),
         name: repo.name,
         owner: repo.owner.login,
         description: repo.description || "No description",
         url: repo.html_url,
+        fullName: repo.full_name,
+        starsCount: repo.stargazers_count,
+        forksCount: repo.forks_count,
+        createdAt: repo.created_at,
+        updatedAt: repo.updated_at,
       }));
-      res.json(githubRepos);
+
+      allGithubRepos = allGithubRepos.concat(mappedRepos);
+      console.log(`Fetched page ${page}: ${reposPage.length} repos (Total so far: ${allGithubRepos.length})`);
+      page++;
+
+      // Optional: Avoid GitHub rate limits (adjust as needed)
+      if (reposPage.length < perPage) break; // Fewer than perPage means last page
     }
+
+    // Upsert all repos into DB
+    const upsertPromises = allGithubRepos.map(async (repoData) => {
+      return Repository.findOneAndUpdate(
+        { githubId: repoData.githubId }, // Find by githubId
+        repoData,                        // Update with GitHub data
+        { upsert: true, new: true }      // Insert if not found, return updated doc
+      );
+    });
+    await Promise.all(upsertPromises);
+    console.log(`Synced ${allGithubRepos.length} repos for ${username} into DB`);
+
+    // Fetch the updated list from DB
+    const dbRepos = await Repository.find({ owner: username });
+    res.json(dbRepos);
   } catch (err) {
-    console.error("Error fetching user repos:", err);
+    console.error("Error fetching/syncing user repos:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
-// Save or update a repository
+// Save or update a repository (unchanged)
 router.post("/", async (req, res) => {
   try {
     const repoData = req.body;
     const { githubId } = repoData;
 
-    // Always upsert: update if exists, insert if not
     const repo = await Repository.findOneAndUpdate(
-      { githubId }, // Find by githubId
-      repoData,     // Update with new data
-      { upsert: true, new: true } // Create if not found, return updated doc
+      { githubId },
+      repoData,
+      { upsert: true, new: true }
     );
     console.log("Saved/Updated Repo:", repo);
     res.status(201).json(repo);

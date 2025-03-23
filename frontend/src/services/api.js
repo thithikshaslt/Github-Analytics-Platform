@@ -5,6 +5,8 @@ const api = axios.create({
   timeout: 15000, // 15-second timeout to avoid hanging
 });
 
+export const syncCommits = (username) => api.post(`/commits/sync/${username}`);
+export const getCommitsTotal = (username) => api.get(`/commits/${username}/total`);
 export const getUser = (username) => {
   return api.get(`/users/${username}`);
 };

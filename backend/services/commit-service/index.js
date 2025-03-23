@@ -1,14 +1,26 @@
-require("dotenv").config();
 const express = require("express");
+require("dotenv").config();
 const mongoose = require("mongoose");
 const commitRoutes = require("./routes/commitRoutes");
 
 const app = express();
+const PORT = process.env.PORT || 5004;
+
 app.use(express.json());
 app.use("/commits", commitRoutes);
 
-mongoose.connect(process.env.MONGO_URI, { useNewUrlParser: true })
-  .then(() => console.log("MongoDB connected successfully"))
-  .catch(err => console.error("MongoDB connection failed:", err.message));
+const MONGO_URI = process.env.MONGO_URI ;
 
-app.listen(5004, () => console.log("Commits Service on 5004"));
+mongoose
+  .connect(MONGO_URI, {
+    useNewUrlParser: true,
+  })
+  .then(() => console.log("MongoDB connected successfully"))
+  .catch((err) => {
+    console.error("MongoDB connection failed:", err.message);
+    process.exit(1);
+  });
+
+app.listen(PORT, () => {
+  console.log(`Commits Service on ${PORT}`);
+});

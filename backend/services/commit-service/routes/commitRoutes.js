@@ -4,91 +4,110 @@ const Commit = require("../models/Commit");
 
 const router = express.Router();
 
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "YOUR_GITHUB_TOKEN_HERE";
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const githubApi = axios.create({
   baseURL: "https://api.github.com",
-  headers: {
-    Authorization: `Bearer ${GITHUB_TOKEN}`,
-    Accept: "application/vnd.github.v3+json",
-  },
+  headers: GITHUB_TOKEN ? { Authorization: `token ${GITHUB_TOKEN}` } : {},
 });
 
-router.get("/", async (req, res) => {
-  try {
-    const commits = await Commit.find();
-    res.json(commits);
-  } catch (err) {
-    console.error("Error fetching commits:", err);
-    res.status(500).json({ error: err.message });
+const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+const syncingUsers = new Set();
+
+router.post("/sync/:username", async (req, res) => {
+  const { username } = req.params;
+
+  if (syncingUsers.has(username)) {
+    return res.status(409).json({ message: `Sync already in progress for ${username}` });
   }
-});
 
-router.get("/:username", async (req, res) => {
+  syncingUsers.add(username);
+
   try {
-    const { username } = req.params;
-    console.log(`Fetching commits for ${username}`);
+    console.log(`Starting full commit sync for ${username}`);
 
     const userResponse = await githubApi.get(`/users/${username}`);
     const userGithubId = userResponse.data.id.toString();
-    let commits = await Commit.find({ author: userGithubId });
 
-    if (commits.length === 0) {
-      console.log(`No commits in DB for ${username} (ID: ${userGithubId}), fetching from GitHub`);
-      const reposResponse = await githubApi.get(`/users/${username}/repos`);
-      const newCommits = [];
+    let allRepos = [];
+    let page = 1;
+    while (true) {
+      const reposResponse = await githubApi.get(`/users/${username}/repos`, {
+        params: { per_page: 100, page },
+      });
+      const reposPage = reposResponse.data;
+      if (reposPage.length === 0) break;
+      allRepos = allRepos.concat(reposPage);
+      console.log(`Fetched ${allRepos.length} repos so far`);
+      page++;
+      await delay(500);
+    }
 
-      for (const repo of reposResponse.data) {
-        const repoId = repo.id.toString();
-        const commitsResponse = await githubApi.get(
-          `/repos/${username}/${repo.name}/commits?author=${username}`
-        );
-        for (const commit of commitsResponse.data) {
-          const exists = await Commit.findOne({ sha: commit.sha });
-          if (!exists) {
-            newCommits.push({
+    let totalCommitsSynced = 0;
+    for (const repo of allRepos) {
+      const repoId = repo.id.toString();
+      let commitPage = 1;
+
+      while (true) {
+        try {
+          const commitsResponse = await githubApi.get(
+            `/repos/${username}/${repo.name}/commits?author=${username}&per_page=100&page=${commitPage}`
+          );
+          const commitsPage = commitsResponse.data;
+          if (commitsPage.length === 0) break;
+
+          // Upsert commits one-by-one to handle duplicates
+          for (const commit of commitsPage) {
+            const commitData = {
               sha: commit.sha,
               repository: repoId,
               author: userGithubId,
               message: commit.commit.message,
-              date: commit.commit.author.date, // Already there—keep it
-            });
+              date: commit.commit.author.date,
+            };
+
+            await Commit.updateOne(
+              { sha: commit.sha }, // Find by SHA
+              { $set: commitData }, // Update or set data
+              { upsert: true } // Insert if not found
+            );
+            totalCommitsSynced++;
           }
+
+          console.log(`Synced ${commitsPage.length} commits for ${repo.name} (Total: ${totalCommitsSynced})`);
+          commitPage++;
+          await delay(1000);
+        } catch (err) {
+          console.error(`Error syncing commits for ${repo.name}: ${err.message}`);
+          if (err.message.includes("ETIMEDOUT")) {
+            console.log("Retrying after MongoDB timeout...");
+            await delay(5000);
+            continue;
+          }
+          break;
         }
       }
-
-      if (newCommits.length > 0) {
-        await Commit.insertMany(newCommits, { ordered: false });
-        console.log(`Saved ${newCommits.length} new commits for ${username}`);
-      }
-      commits = await Commit.find({ author: userGithubId });
     }
 
-    // Return full commits instead of just count
-    res.json({ commits }); // Array of commit objects
+    console.log(`Finished syncing ${totalCommitsSynced} commits for ${username}`);
+    res.json({ message: `Synced ${totalCommitsSynced} commits`, totalCommits: totalCommitsSynced });
   } catch (err) {
-    console.error("Error fetching user commits:", err.message);
+    console.error("Error syncing commits:", err.message);
     res.status(500).json({ error: err.message });
+  } finally {
+    syncingUsers.delete(username);
   }
 });
 
-router.post("/", async (req, res) => {
+router.get("/:username/total", async (req, res) => {
   try {
-    const commitData = req.body;
-    const { sha, upsert } = commitData;
-    if (upsert) {
-      const commit = await Commit.findOneAndUpdate(
-        { sha },
-        commitData,
-        { upsert: true, new: true }
-      );
-      res.status(201).json(commit);
-    } else {
-      const commit = new Commit(commitData);
-      await commit.save();
-      res.status(201).json(commit);
-    }
+    const { username } = req.params;
+    const userResponse = await githubApi.get(`/users/${username}`);
+    const userGithubId = userResponse.data.id.toString();
+    const totalCommits = await Commit.countDocuments({ author: userGithubId });
+    res.json({ totalCommits });
   } catch (err) {
-    console.error("Error saving commit:", err);
+    console.error("Error fetching total commits:", err.message);
     res.status(500).json({ error: err.message });
   }
 });
