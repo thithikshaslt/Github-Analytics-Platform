@@ -4,7 +4,7 @@ import { getUser, getRepos, getCommits } from '../services/api';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
 function Insights() {
-  const { username } = useParams(); // e.g., /insights/thithikshaslt
+  const { username } = useParams();
   const [user, setUser] = useState(null);
   const [repos, setRepos] = useState([]);
   const [commits, setCommits] = useState(null);
@@ -13,6 +13,7 @@ function Insights() {
   useEffect(() => {
     Promise.all([getUser(username), getRepos(username), getCommits(username)])
       .then(([userResponse, reposResponse, commitsResponse]) => {
+        console.log("User Data:", userResponse.data); // Debug
         setUser(userResponse.data);
         setRepos(reposResponse.data);
         setCommits(commitsResponse.data);
@@ -30,7 +31,21 @@ function Insights() {
       {user ? (
         <Card className="max-w-md mx-auto">
           <CardHeader>
-            <CardTitle>{user.username}</CardTitle>
+            <div className="flex items-center space-x-4">
+              {user.avatarUrl ? (
+                <img
+                  src={user.avatarUrl}
+                  alt={`${username}'s profile`}
+                  className="w-16 h-16 rounded-full"
+                  onError={(e) => console.error("Image load failed:", e)} // Debug image errors
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-gray-300 flex items-center justify-center text-gray-600">
+                  No Photo
+                </div>
+              )}
+              <CardTitle>{user.username}</CardTitle>
+            </div>
           </CardHeader>
           <CardContent>
             <p className="text-gray-700">{user.bio || 'No bio available'}</p>

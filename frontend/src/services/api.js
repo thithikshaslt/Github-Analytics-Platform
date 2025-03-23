@@ -1,8 +1,8 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:15000', 
-  timeout: 5000, // 15-second timeout to avoid hanging
+  baseURL: 'http://localhost:5000', 
+  timeout: 15000, // 15-second timeout to avoid hanging
 });
 
 export const getUser = (username) => {
@@ -14,7 +14,7 @@ export const getRepos = (username) => {
 };
 
 export const getCommits = (owner, repo) => {
-  return api.get(`/commits/${owner}/`);
+  return api.get(`/commits/${owner}`);
 };
 
 export const getPulls = (owner, repo) => {
