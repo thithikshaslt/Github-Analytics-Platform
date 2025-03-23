@@ -38,6 +38,33 @@ app.use(
     })
 );
 
+// Proxy to repos-service
+app.use(
+    "/repos",
+    (req, res, next) => {
+        console.log("Before Proxy Middleware - Request received at API Gateway for Repos Service");
+        next();
+    },
+    createProxyMiddleware({
+        target: "http://localhost:5003",
+        changeOrigin: true,
+        pathRewrite: (path, req) => {
+            console.log(`Original Path: ${path}`);
+            const newPath = `/repos${path}`; // Preserve /repos prefix
+            console.log(`Rewritten Path: ${newPath}`);
+            return newPath;
+        },
+        logLevel: "debug",
+        onProxyReq: (proxyReq, req, res) => {
+            console.log(`Forwarding request to Repos Service: ${req.method} ${req.originalUrl}`);
+        },
+        onError: (err, req, res) => {
+            console.error(`Proxy error: ${err.message}`);
+            res.status(500).json({ error: "Proxy failed" });
+        },
+    })
+);
+
 // Start API Gateway only once
 app.listen(PORT, () => {
     console.log(`API Gateway is running on port ${PORT}`);

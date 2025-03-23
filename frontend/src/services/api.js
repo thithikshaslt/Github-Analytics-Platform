@@ -13,7 +13,7 @@ export const getUser = (username) => {
 
 // Placeholder functions for future endpoints
 export const getRepos = (username) => {
-  return api.get(`/github/repos/${username}`);
+  return api.get(`/repos/${username}`);
 };
 
 export const getCommits = (owner, repo) => {
