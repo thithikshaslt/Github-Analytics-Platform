@@ -13,7 +13,7 @@ function Insights() {
   useEffect(() => {
     Promise.all([getUser(username), getRepos(username), getCommits(username)])
       .then(([userResponse, reposResponse, commitsResponse]) => {
-        console.log("User Data:", userResponse.data); // Debug
+        console.log("User Data:", userResponse.data);
         setUser(userResponse.data);
         setRepos(reposResponse.data);
         setCommits(commitsResponse.data);
@@ -25,11 +25,11 @@ function Insights() {
   }, [username]);
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
+    <div className="min-h-screen bg-gray-100 p-6 w-full"> {/* Added w-full */}
       <h1 className="text-3xl text-gray-900 mb-6">Insights for {username}</h1>
       {error && <p className="text-red-500 mb-4">Error: {error}</p>}
       {user ? (
-        <Card className="max-w-md mx-auto">
+        <Card className="w-full max-w-2xl mx-auto"> {/* Changed max-w-md to max-w-2xl */}
           <CardHeader>
             <div className="flex items-center space-x-4">
               {user.avatarUrl ? (
@@ -37,7 +37,7 @@ function Insights() {
                   src={user.avatarUrl}
                   alt={`${username}'s profile`}
                   className="w-16 h-16 rounded-full"
-                  onError={(e) => console.error("Image load failed:", e)} // Debug image errors
+                  onError={(e) => console.error("Image load failed:", e)}
                 />
               ) : (
                 <div className="w-16 h-16 rounded-full bg-gray-300 flex items-center justify-center text-gray-600">
@@ -49,15 +49,7 @@ function Insights() {
           </CardHeader>
           <CardContent>
             <p className="text-gray-700">{user.bio || 'No bio available'}</p>
-            <p className="mt-2 text-gray-600">Repos: {repos.length}</p>
-            {repos.map((repo) => (
-              <p key={repo.githubId || repo.name} className="text-gray-600 ml-4">
-                - <a href={repo.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
-                  {repo.name}
-                </a>
-                {repo.description && `: ${repo.description}`}
-              </p>
-            ))}
+            <p className="mt-2 text-gray-600">Repositories: {repos.length}</p>
             <p className="mt-2 text-gray-600">
               Commits: {commits ? commits.totalCommits : 'Loading...'}
             </p>

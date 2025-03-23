@@ -15,10 +15,10 @@ function Welcome() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-      <div className="text-center">
+    <div className="min-h-screen bg-gray-100 flex items-center justify-center w-full">
+      <div className="text-center w-full max-w-md mx-auto p-6">
         <h1 className="text-4xl text-gray-900 mb-6">Welcome!</h1>
-        <form onSubmit={handleSubmit} className="flex gap-2 max-w-md mx-auto">
+        <form onSubmit={handleSubmit} className="flex gap-2">
           <Input
             value={username}
             onChange={(e) => setUsername(e.target.value)}
