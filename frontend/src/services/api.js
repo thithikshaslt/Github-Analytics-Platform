@@ -17,7 +17,7 @@ export const getRepos = (username) => {
 };
 
 export const getCommits = (owner, repo) => {
-  return api.get(`/github/commits/${owner}/${repo}`);
+  return api.get(`/commits/${owner}/`);
 };
 
 export const getPulls = (owner, repo) => {

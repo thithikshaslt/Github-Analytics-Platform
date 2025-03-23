@@ -1,20 +1,21 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { getUser, getRepos } from '../services/api';
+import { getUser, getRepos, getCommits } from '../services/api';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
 function Insights() {
-  const { username } = useParams(); // Gets username from URL (e.g., /insights/thithikshaslt)
+  const { username } = useParams(); // e.g., /insights/thithikshaslt
   const [user, setUser] = useState(null);
   const [repos, setRepos] = useState([]);
+  const [commits, setCommits] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    // Fetch user and repos data in parallel
-    Promise.all([getUser(username), getRepos(username)])
-      .then(([userResponse, reposResponse]) => {
+    Promise.all([getUser(username), getRepos(username), getCommits(username)])
+      .then(([userResponse, reposResponse, commitsResponse]) => {
         setUser(userResponse.data);
         setRepos(reposResponse.data);
+        setCommits(commitsResponse.data);
       })
       .catch((err) => {
         console.error('Fetch error:', err);
@@ -42,7 +43,9 @@ function Insights() {
                 {repo.description && `: ${repo.description}`}
               </p>
             ))}
-            <p className="mt-2 text-gray-600">Commits: Coming soon</p>
+            <p className="mt-2 text-gray-600">
+              Commits: {commits ? commits.totalCommits : 'Loading...'}
+            </p>
             <p className="mt-2 text-gray-600">PRs: Coming soon</p>
           </CardContent>
         </Card>
