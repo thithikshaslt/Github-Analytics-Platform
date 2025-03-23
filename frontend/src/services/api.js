@@ -1,17 +1,14 @@
 import axios from 'axios';
 
-// Create an Axios instance with a base URL and configuration
 const api = axios.create({
-  baseURL: 'http://localhost:5000', // Your API Gateway URL
-  timeout: 5000, // Optional: 5-second timeout to avoid hanging
+  baseURL: 'http://localhost:15000', 
+  timeout: 5000, // 15-second timeout to avoid hanging
 });
 
-// Function to fetch user data from the user-service via the API Gateway
 export const getUser = (username) => {
   return api.get(`/users/${username}`);
 };
 
-// Placeholder functions for future endpoints
 export const getRepos = (username) => {
   return api.get(`/repos/${username}`);
 };
@@ -24,5 +21,4 @@ export const getPulls = (owner, repo) => {
   return api.get(`/github/pulls/${owner}/${repo}`);
 };
 
-// Export the Axios instance for flexibility (optional)
 export default api;
