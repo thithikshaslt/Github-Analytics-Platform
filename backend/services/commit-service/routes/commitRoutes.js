@@ -88,7 +88,6 @@ router.post("/sync/:username", async (req, res) => {
   }
 });
 
-// Add this endpoint
 router.get("/:username", async (req, res) => {
   try {
     const { username } = req.params;
@@ -102,7 +101,7 @@ router.get("/:username", async (req, res) => {
     const commits = await Commit.find({ author: userGithubId })
       .skip((page - 1) * perPage)
       .limit(perPage)
-      .lean(); // Faster, plain JS objects
+      .lean(); 
 
     const totalCommits = await Commit.countDocuments({ author: userGithubId });
 

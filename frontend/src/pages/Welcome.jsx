@@ -15,17 +15,17 @@ function Welcome() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex items-center justify-center w-full">
+    <div className="min-h-screen bg-background flex items-center justify-center w-full dark">
       <div className="text-center w-full max-w-md mx-auto p-6">
-        <h1 className="text-4xl text-gray-900 mb-6">Welcome!</h1>
+        <h1 className="text-4xl text-foreground mb-6">Welcome!</h1>
         <form onSubmit={handleSubmit} className="flex gap-2">
           <Input
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             placeholder="Enter your GitHub username"
-            className="border-gray-300 focus:ring-blue-600"
+            className="border-border bg-card text-foreground placeholder-muted-foreground focus:ring-primary focus:border-primary"
           />
-          <Button type="submit" className="bg-blue-600 text-white hover:bg-blue-700">
+          <Button type="submit" className="bg-primary text-primary-foreground hover:bg-[#4a2885]">
             Go
           </Button>
         </form>

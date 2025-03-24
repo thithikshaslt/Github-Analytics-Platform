@@ -1,9 +1,9 @@
 const mongoose = require("mongoose");
 
 const repositorySchema = new mongoose.Schema({
-  githubId: { type: Number, required: true, unique: true }, // GitHub repo ID
+  githubId: { type: Number, required: true, unique: true },
   name: { type: String, required: true },
-  owner: { type: String, required: true }, // Store githubId as a string for now
+  owner: { type: String, required: true }, 
   fullName: { type: String },
   description: { type: String },
   url: { type: String },

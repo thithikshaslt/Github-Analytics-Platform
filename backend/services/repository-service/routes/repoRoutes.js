@@ -1,10 +1,10 @@
 const express = require("express");
 const axios = require("axios");
 const Repository = require("../models/Repository");
-require("dotenv").config(); // Add this
+require("dotenv").config(); 
 const router = express.Router();
 
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN || "YOUR_GITHUB_TOKEN_HERE"; // Add to .env
+const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
 const githubApi = axios.create({
   baseURL: "https://api.github.com",
   headers: GITHUB_TOKEN ? { Authorization: `token ${GITHUB_TOKEN}` } : {},
@@ -28,10 +28,9 @@ router.get("/:username", async (req, res) => {
     const { username } = req.params;
     console.log(`Fetching ALL repos for user: ${username}`);
 
-    // Fetch all repos from GitHub with pagination
     let allGithubRepos = [];
     let page = 1;
-    const perPage = 100; // Max allowed by GitHub API
+    const perPage = 100;
 
     while (true) {
       const response = await githubApi.get(`/users/${username}/repos`, {
@@ -42,7 +41,7 @@ router.get("/:username", async (req, res) => {
       });
       const reposPage = response.data;
 
-      if (reposPage.length === 0) break; // No more repos, exit loop
+      if (reposPage.length === 0) break;
 
       const mappedRepos = reposPage.map(repo => ({
         githubId: repo.id.toString(),
@@ -61,11 +60,9 @@ router.get("/:username", async (req, res) => {
       console.log(`Fetched page ${page}: ${reposPage.length} repos (Total so far: ${allGithubRepos.length})`);
       page++;
 
-      // Optional: Avoid GitHub rate limits (adjust as needed)
-      if (reposPage.length < perPage) break; // Fewer than perPage means last page
+      if (reposPage.length < perPage) break; 
     }
 
-    // Upsert all repos into DB
     const upsertPromises = allGithubRepos.map(async (repoData) => {
       return Repository.findOneAndUpdate(
         { githubId: repoData.githubId }, // Find by githubId
@@ -85,7 +82,6 @@ router.get("/:username", async (req, res) => {
   }
 });
 
-// Save or update a repository (unchanged)
 router.post("/", async (req, res) => {
   try {
     const repoData = req.body;

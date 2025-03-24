@@ -1,7 +1,7 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const userRoutes = require("./routes/userRoutes"); 
-require("dotenv").config(); // Add this to load .env variables
+require("dotenv").config(); 
 
 const app = express();
 const PORT = process.env.PORT || 5002;

@@ -1,9 +1,9 @@
 const express = require("express");
 const { createProxyMiddleware } = require("http-proxy-middleware");
-const cors = require("cors"); // Added for CORS
+const cors = require("cors"); 
 
 const app = express();
-app.use(cors({ origin: "http://localhost:5173" })); // Added to allow frontend requests
+app.use(cors({ origin: "http://localhost:5173" })); // allow frontend requests
 
 const PORT = 5000; // API Gateway port
 
@@ -23,7 +23,7 @@ app.use(
         changeOrigin: true,
         pathRewrite: (path, req) => {
             console.log(`Original Path: ${path}`);
-            const newPath = `/users${path}`; // Preserve /users prefix
+            const newPath = `/users${path}`; 
             console.log(`Rewritten Path: ${newPath}`);
             return newPath;
         },
@@ -38,7 +38,6 @@ app.use(
     })
 );
 
-// Proxy to repos-service
 app.use(
     "/repos",
     (req, res, next) => {
@@ -50,7 +49,7 @@ app.use(
         changeOrigin: true,
         pathRewrite: (path, req) => {
             console.log(`Original Path: ${path}`);
-            const newPath = `/repos${path}`; // Preserve /repos prefix
+            const newPath = `/repos${path}`; 
             console.log(`Rewritten Path: ${newPath}`);
             return newPath;
         },
@@ -76,7 +75,7 @@ app.use(
       changeOrigin: true,
       pathRewrite: (path, req) => {
         console.log(`Original Path: ${path}`);
-        const newPath = `/commits${path}`; // Preserve /repos prefix
+        const newPath = `/commits${path}`; 
         console.log(`Rewritten Path: ${newPath}`);
         return newPath;
       },
@@ -91,7 +90,6 @@ app.use(
     })
   );
 
-// Start API Gateway only once
 app.listen(PORT, () => {
     console.log(`API Gateway is running on port ${PORT}`);
 });

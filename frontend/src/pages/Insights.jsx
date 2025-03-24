@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom'; // Added useNavigate
 import { getUser, getRepos, getCommitsTotal, syncCommits } from '../services/api';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
@@ -10,6 +10,7 @@ function Insights() {
   const [totalCommits, setTotalCommits] = useState(null);
   const [error, setError] = useState(null);
   const [syncing, setSyncing] = useState(false);
+  const navigate = useNavigate(); // Hook for navigation
 
   const fetchData = () => {
     Promise.all([getUser(username), getRepos(username), getCommitsTotal(username)])
@@ -43,35 +44,39 @@ function Insights() {
     }
   };
 
+  const handleViewCommits = () => {
+    navigate(`/commits/${username}`); // Navigate to CommitsDashboard
+  };
+
   return (
-    <div className="min-h-screen bg-gray-100 p-6 w-full">
-      <h1 className="text-3xl text-gray-900 mb-6">Insights for {username}</h1>
-      {error && <p className="text-red-500 mb-4">Error: {error}</p>}
+    <div className="min-h-screen bg-background p-6 w-full dark">
+      <h1 className="text-3xl text-foreground mb-6">Insights for {username}</h1>
+      {error && <p className="text-destructive mb-4">Error: {error}</p>}
       {user ? (
-        <Card className="w-full max-w-2xl mx-auto">
+        <Card className="w-full max-w-2xl mx-auto bg-card text-card-foreground border-border">
           <CardHeader>
             <div className="flex items-center space-x-4">
               {user.avatarUrl ? (
                 <img src={user.avatarUrl} alt={`${username}'s profile`} className="w-16 h-16 rounded-full" />
               ) : (
-                <div className="w-16 h-16 rounded-full bg-gray-300 flex items-center justify-center text-gray-600">
+                <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center text-muted-foreground">
                   No Photo
                 </div>
               )}
-              <CardTitle>{user.username}</CardTitle>
+              <CardTitle className="text-foreground">{user.username}</CardTitle>
             </div>
           </CardHeader>
           <CardContent>
-            <p className="text-gray-700 mb-4">{user.bio || 'No bio available'}</p>
+            <p className="text-foreground mb-4">{user.bio || 'No bio available'}</p>
             <div className="space-y-2">
-              <p className="text-gray-600">Repositories: {repos.length} total</p>
+              <p className="text-muted-foreground">Repositories: {repos.length} total</p>
               {repos.length > 0 && (
                 <div>
-                  <p className="text-gray-600 font-semibold">Top Repositories:</p>
-                  <ul className="list-disc list-inside text-gray-600">
+                  <p className="text-muted-foreground font-semibold">Top Repositories:</p>
+                  <ul className="list-disc list-inside text-muted-foreground">
                     {repos.slice(0, 3).map((repo) => (
                       <li key={repo.githubId}>
-                        <a href={repo.url} target="_blank" rel="noopener noreferrer" className="text-blue-500 hover:underline">
+                        <a href={repo.url} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                           {repo.name}
                         </a>
                       </li>
@@ -80,25 +85,31 @@ function Insights() {
                 </div>
               )}
               <div className="flex items-center space-x-2">
-                <p className="text-gray-600">
+                <p className="text-muted-foreground">
                   Commits: {totalCommits !== null ? totalCommits : 'Loading...'}
                 </p>
                 <button
                   onClick={handleSyncCommits}
                   disabled={syncing}
-                  className="bg-blue-500 text-white p-1 rounded hover:bg-blue-600 disabled:bg-gray-400"
+                  className="bg-primary text-primary-foreground p-1 rounded hover:bg-[#4a2885] disabled:bg-muted"
                 >
                   {syncing ? 'Syncing...' : 'Sync Commits'}
                 </button>
+                <button
+                  onClick={handleViewCommits}
+                  className="bg-primary text-primary-foreground p-1 rounded hover:bg-[#4a2885]"
+                >
+                  View Commits
+                </button>
               </div>
-              <p className="text-gray-600">PRs: Coming soon</p>
+              <p className="text-muted-foreground">PRs: Coming soon</p>
             </div>
           </CardContent>
         </Card>
       ) : (
         <div className="flex items-center justify-center min-h-[200px]">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          <span className="ml-2 text-gray-900">Loading...</span>
+          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
+          <span className="ml-2 text-foreground">Loading...</span>
         </div>
       )}
     </div>
