@@ -1,26 +1,12 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:5000', 
-  timeout: 15000, // 15-second timeout to avoid hanging
+  baseURL: 'http://localhost:5000',
 });
 
-export const syncCommits = (username) => api.post(`/commits/sync/${username}`);
+export const getUser = (username) => api.get(`/users/${username}`);
+export const getRepos = (username) => api.get(`/repos/${username}`);
 export const getCommitsTotal = (username) => api.get(`/commits/${username}/total`);
-export const getUser = (username) => {
-  return api.get(`/users/${username}`);
-};
-
-export const getRepos = (username) => {
-  return api.get(`/repos/${username}`);
-};
-
-export const getCommits = (owner, repo) => {
-  return api.get(`/commits/${owner}`);
-};
-
-export const getPulls = (owner, repo) => {
-  return api.get(`/github/pulls/${owner}/${repo}`);
-};
-
-export default api;
+export const syncCommits = (username) => api.post(`/commits/sync/${username}`);
+export const getCommits = (username, page = 1, perPage = 20) =>
+  api.get(`/commits/${username}`, { params: { page, perPage } });

@@ -11,21 +11,16 @@ const githubApi = axios.create({
 });
 
 const delay = (ms) => new Promise(resolve => setTimeout(resolve, ms));
-
 const syncingUsers = new Set();
 
 router.post("/sync/:username", async (req, res) => {
   const { username } = req.params;
-
   if (syncingUsers.has(username)) {
     return res.status(409).json({ message: `Sync already in progress for ${username}` });
   }
-
   syncingUsers.add(username);
-
   try {
     console.log(`Starting full commit sync for ${username}`);
-
     const userResponse = await githubApi.get(`/users/${username}`);
     const userGithubId = userResponse.data.id.toString();
 
@@ -47,7 +42,6 @@ router.post("/sync/:username", async (req, res) => {
     for (const repo of allRepos) {
       const repoId = repo.id.toString();
       let commitPage = 1;
-
       while (true) {
         try {
           const commitsResponse = await githubApi.get(
@@ -56,7 +50,6 @@ router.post("/sync/:username", async (req, res) => {
           const commitsPage = commitsResponse.data;
           if (commitsPage.length === 0) break;
 
-          // Upsert commits one-by-one to handle duplicates
           for (const commit of commitsPage) {
             const commitData = {
               sha: commit.sha,
@@ -65,22 +58,19 @@ router.post("/sync/:username", async (req, res) => {
               message: commit.commit.message,
               date: commit.commit.author.date,
             };
-
             await Commit.updateOne(
-              { sha: commit.sha }, // Find by SHA
-              { $set: commitData }, // Update or set data
-              { upsert: true } // Insert if not found
+              { sha: commit.sha },
+              { $set: commitData },
+              { upsert: true }
             );
             totalCommitsSynced++;
           }
-
           console.log(`Synced ${commitsPage.length} commits for ${repo.name} (Total: ${totalCommitsSynced})`);
           commitPage++;
           await delay(1000);
         } catch (err) {
           console.error(`Error syncing commits for ${repo.name}: ${err.message}`);
           if (err.message.includes("ETIMEDOUT")) {
-            console.log("Retrying after MongoDB timeout...");
             await delay(5000);
             continue;
           }
@@ -88,7 +78,6 @@ router.post("/sync/:username", async (req, res) => {
         }
       }
     }
-
     console.log(`Finished syncing ${totalCommitsSynced} commits for ${username}`);
     res.json({ message: `Synced ${totalCommitsSynced} commits`, totalCommits: totalCommitsSynced });
   } catch (err) {
@@ -96,6 +85,36 @@ router.post("/sync/:username", async (req, res) => {
     res.status(500).json({ error: err.message });
   } finally {
     syncingUsers.delete(username);
+  }
+});
+
+// Add this endpoint
+router.get("/:username", async (req, res) => {
+  try {
+    const { username } = req.params;
+    const page = parseInt(req.query.page) || 1;
+    const perPage = parseInt(req.query.perPage) || 20;
+    console.log(`Fetching commits for ${username}, page ${page}`);
+
+    const userResponse = await githubApi.get(`/users/${username}`);
+    const userGithubId = userResponse.data.id.toString();
+
+    const commits = await Commit.find({ author: userGithubId })
+      .skip((page - 1) * perPage)
+      .limit(perPage)
+      .lean(); // Faster, plain JS objects
+
+    const totalCommits = await Commit.countDocuments({ author: userGithubId });
+
+    res.json({
+      commits,
+      totalCommits,
+      page,
+      totalPages: Math.ceil(totalCommits / perPage),
+    });
+  } catch (err) {
+    console.error("Error fetching commits:", err.message);
+    res.status(500).json({ error: err.message });
   }
 });
 

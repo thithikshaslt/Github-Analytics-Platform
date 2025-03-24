@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { getCommits } from '../services/api';
-import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -12,6 +11,7 @@ import {
   Tooltip,
   Legend,
 } from 'chart.js';
+import { Line } from 'react-chartjs-2';
 
 // Register Chart.js components
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, Tooltip, Legend);
@@ -19,60 +19,74 @@ ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Title, T
 function CommitsDashboard() {
   const { username } = useParams();
   const [commits, setCommits] = useState([]);
+  const [totalCommits, setTotalCommits] = useState(0);
   const [error, setError] = useState(null);
+  const [chartData, setChartData] = useState(null);
 
   useEffect(() => {
-    getCommits(username)
-      .then((response) => {
+    const fetchCommits = async () => {
+      try {
+        // Fetch all commits (no pagination for simplicity—adjust if needed)
+        const response = await getCommits(username, 1, 1000); // Bump perPage to get more
+        console.log("Commits Response:", response.data);
         setCommits(response.data.commits);
-      })
-      .catch((err) => {
-        console.error('Fetch error:', err);
+        setTotalCommits(response.data.totalCommits);
+
+        // Process commits for chart
+        const commitDates = response.data.commits.reduce((acc, commit) => {
+          const date = new Date(commit.date).toLocaleDateString('en-US', {
+            month: 'short',
+            year: 'numeric',
+          }); // e.g., "Mar 2025"
+          acc[date] = (acc[date] || 0) + 1;
+          return acc;
+        }, {});
+
+        const labels = Object.keys(commitDates).sort((a, b) => new Date(a) - new Date(b));
+        const data = labels.map((label) => commitDates[label]);
+
+        setChartData({
+          labels,
+          datasets: [
+            {
+              label: 'Commits Over Time',
+              data,
+              borderColor: 'rgb(75, 192, 192)',
+              tension: 0.1,
+            },
+          ],
+        });
+      } catch (err) {
+        console.error("Fetch error:", err);
         setError(err.message);
-      });
+      }
+    };
+    fetchCommits();
   }, [username]);
 
-  // Aggregate commits by date (daily count)
-  const commitDates = commits.reduce((acc, commit) => {
-    const date = new Date(commit.date).toLocaleDateString();
-    acc[date] = (acc[date] || 0) + 1;
-    return acc;
-  }, {});
-
-  const chartData = {
-    labels: Object.keys(commitDates),
-    datasets: [
-      {
-        label: 'Commits Over Time',
-        data: Object.values(commitDates),
-        borderColor: 'rgb(75, 192, 192)',
-        tension: 0.1,
-      },
-    ],
-  };
-
-  const options = {
+  const chartOptions = {
     responsive: true,
     plugins: {
       legend: { position: 'top' },
-      title: { display: true, text: `${username}'s Commit Activity` },
+      title: { display: true, text: `Commit Activity for ${username}` },
+    },
+    scales: {
+      x: { title: { display: true, text: 'Date' } },
+      y: { title: { display: true, text: 'Number of Commits' }, beginAtZero: true },
     },
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 p-6 w-full">
+    <div className="min-h-screen bg-gray-100 p-6">
       <h1 className="text-3xl text-gray-900 mb-6">Commits Dashboard for {username}</h1>
       {error && <p className="text-red-500 mb-4">Error: {error}</p>}
-      {commits.length > 0 ? (
+      {chartData ? (
         <div className="max-w-4xl mx-auto">
-          <Line data={chartData} options={options} />
-          <p className="mt-4 text-gray-600">Total Commits: {commits.length}</p>
+          <p className="text-gray-600 mb-4">Total Commits: {totalCommits}</p>
+          <Line data={chartData} options={chartOptions} />
         </div>
       ) : (
-        <div className="flex items-center justify-center min-h-[200px]">
-          <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          <span className="ml-2 text-gray-900">Loading...</span>
-        </div>
+        <p className="text-gray-900">Loading commits...</p>
       )}
     </div>
   );
