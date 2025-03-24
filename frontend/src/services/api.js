@@ -10,3 +10,4 @@ export const getCommitsTotal = (username) => api.get(`/commits/${username}/total
 export const syncCommits = (username) => api.post(`/commits/sync/${username}`);
 export const getCommits = (username, page = 1, perPage = 20) =>
   api.get(`/commits/${username}`, { params: { page, perPage } });
+

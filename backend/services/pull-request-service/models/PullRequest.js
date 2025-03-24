@@ -1,15 +1,19 @@
 const mongoose = require("mongoose");
 
-const pullRequestSchema = new mongoose.Schema({
-  githubId: { type: Number, required: true, unique: true }, 
-  repository: { type: String, required: true }, 
-  title: { type: String },
-  number: { type: Number, required: true },
-  state: { type: String, required: true }, 
-  createdAt: { type: Date, required: true },
-  mergedAt: { type: Date },
-  closedAt: { type: Date },
-  author: { type: String, required: true }, 
-});
+const pullRequestSchema = new mongoose.Schema(
+  {
+    prId: { type: String, required: true, unique: true }, // GitHub PR ID
+    number: { type: Number, required: true }, // PR number in repo
+    repository: { type: String, required: true }, // Repo ID
+    author: { type: String, required: true }, // User’s GitHub ID
+    title: { type: String, required: true },
+    state: { type: String, required: true }, // "open", "closed", "merged"
+    createdAt: { type: Date, required: true },
+    updatedAt: { type: Date },
+    closedAt: { type: Date },
+  },
+  { timestamps: true, collection: "pullRequests" }
+);
 
-module.exports = mongoose.model("PullRequest", pullRequestSchema);
+const PullRequest = mongoose.model("PullRequest", pullRequestSchema);
+module.exports = PullRequest;

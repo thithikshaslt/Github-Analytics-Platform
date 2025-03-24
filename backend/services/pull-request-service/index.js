@@ -1,31 +1,23 @@
 const express = require("express");
-const mongoose = require("mongoose");
-const pullRoutes = require("./routes/pullRoutes");
 require("dotenv").config();
+const mongoose = require("mongoose");
+const prRoutes = require("./routes/pullRoutes");
 
 const app = express();
 const PORT = process.env.PORT || 5005;
 
 app.use(express.json());
-app.use("/pulls", pullRoutes);
+app.use("/prs", prRoutes);
 
-const ATLAS_URI = process.env.MONGO_URI;
-
-const connectWithRetry = () => {
-  mongoose
-    .connect(ATLAS_URI, {
-      bufferCommands: true, 
-      bufferTimeoutMS: 30000, 
-    })
-    .then(() => console.log("Connected to MongoDB"))
-    .catch((err) => {
-      console.error("MongoDB connection error:", err);
-      setTimeout(connectWithRetry, 5000); 
-    });
-};
-
-connectWithRetry();
+const MONGO_URI = process.env.MONGO_URI;
+mongoose
+  .connect(MONGO_URI, {})
+  .then(() => console.log("MongoDB connected successfully"))
+  .catch((err) => {
+    console.error("MongoDB connection failed:", err.message);
+    process.exit(1);
+  });
 
 app.listen(PORT, () => {
-  console.log(`Pull Request Service is running on port ${PORT}`);
+  console.log(`PR Service on ${PORT}`);
 });
