@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom'; // Added useNavigate
-import { getUser, getRepos, getCommitsTotal, syncCommits } from '../services/api';
+import { useParams, useNavigate } from 'react-router-dom';
+import { getUser, getRepos, getCommitsTotal, syncCommits, getPRsTotal, syncPRs } from '../services/api';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 
 function Insights() {
@@ -8,17 +8,26 @@ function Insights() {
   const [user, setUser] = useState(null);
   const [repos, setRepos] = useState([]);
   const [totalCommits, setTotalCommits] = useState(null);
+  const [totalPRs, setTotalPRs] = useState(null); // New state for PRs
   const [error, setError] = useState(null);
-  const [syncing, setSyncing] = useState(false);
-  const navigate = useNavigate(); // Hook for navigation
+  const [syncingCommits, setSyncingCommits] = useState(false); // Renamed for clarity
+  const [syncingPRs, setSyncingPRs] = useState(false); // New state for PR sync
+  const navigate = useNavigate();
 
   const fetchData = () => {
-    Promise.all([getUser(username), getRepos(username), getCommitsTotal(username)])
-      .then(([userResponse, reposResponse, commitsResponse]) => {
+    Promise.all([
+      getUser(username),
+      getRepos(username),
+      getCommitsTotal(username),
+      getPRsTotal(username), // Fetch PR total
+    ])
+      .then(([userResponse, reposResponse, commitsResponse, prsResponse]) => {
         console.log("Commits Total:", commitsResponse.data);
+        console.log("PRs Total:", prsResponse.data);
         setUser(userResponse.data);
         setRepos(reposResponse.data);
         setTotalCommits(commitsResponse.data.totalCommits);
+        setTotalPRs(prsResponse.data.totalPRs); // Set PR total
       })
       .catch((err) => {
         console.error("Fetch Error:", err);
@@ -31,21 +40,35 @@ function Insights() {
   }, [username]);
 
   const handleSyncCommits = async () => {
-    setSyncing(true);
+    setSyncingCommits(true);
     try {
       const syncResponse = await syncCommits(username);
       setTotalCommits(syncResponse.data.totalCommits);
       console.log(`Synced ${syncResponse.data.totalCommits} commits`);
-      fetchData(); // Refresh all data post-sync
+      fetchData(); // Refresh all data
     } catch (err) {
       setError(err.message);
     } finally {
-      setSyncing(false);
+      setSyncingCommits(false);
+    }
+  };
+
+  const handleSyncPRs = async () => {
+    setSyncingPRs(true);
+    try {
+      const syncResponse = await syncPRs(username);
+      setTotalPRs(syncResponse.data.totalPRs);
+      console.log(`Synced ${syncResponse.data.totalPRs} PRs`);
+      fetchData(); // Refresh all data
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setSyncingPRs(false);
     }
   };
 
   const handleViewCommits = () => {
-    navigate(`/commits/${username}`); // Navigate to CommitsDashboard
+    navigate(`/commits/${username}`);
   };
 
   return (
@@ -90,10 +113,10 @@ function Insights() {
                 </p>
                 <button
                   onClick={handleSyncCommits}
-                  disabled={syncing}
+                  disabled={syncingCommits}
                   className="bg-primary text-primary-foreground p-1 rounded hover:bg-[#4a2885] disabled:bg-muted"
                 >
-                  {syncing ? 'Syncing...' : 'Sync Commits'}
+                  {syncingCommits ? 'Syncing...' : 'Sync Commits'}
                 </button>
                 <button
                   onClick={handleViewCommits}
@@ -102,7 +125,18 @@ function Insights() {
                   View Commits
                 </button>
               </div>
-              <p className="text-muted-foreground">PRs: Coming soon</p>
+              <div className="flex items-center space-x-2">
+                <p className="text-muted-foreground">
+                  PRs: {totalPRs !== null ? totalPRs : 'Loading...'} {/* Display PR total */}
+                </p>
+                <button
+                  onClick={handleSyncPRs}
+                  disabled={syncingPRs}
+                  className="bg-primary text-primary-foreground p-1 rounded hover:bg-[#4a2885] disabled:bg-muted"
+                >
+                  {syncingPRs ? 'Syncing...' : 'Sync PRs'}
+                </button>
+              </div>
             </div>
           </CardContent>
         </Card>
