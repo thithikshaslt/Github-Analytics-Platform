@@ -15,3 +15,8 @@ export const getPRsTotal = (username) => api.get(`/prs/${username}/total`);
 export const syncPRs = (username) => api.post(`/prs/sync/${username}`);
 export const getPRs = (username, page = 1, perPage = 20) =>
   api.get(`/prs/${username}`, { params: { page, perPage } });
+
+export const getRepoCommitsTotal = (username, repoId) =>
+  api.get(`/commits/${username}/repo/${repoId}/total`);
+export const getRepoPRsTotal = (username, repoId) =>
+  api.get(`/prs/${username}/repo/${repoId}/total`);

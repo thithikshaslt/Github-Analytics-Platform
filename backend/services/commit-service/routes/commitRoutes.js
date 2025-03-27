@@ -130,4 +130,16 @@ router.get("/:username/total", async (req, res) => {
   }
 });
 
+router.get("/:username/repo/:repoId/total", async (req, res) => {
+  try {
+    const { repoId } = req.params;
+    const totalCommits = await Commit.countDocuments({ repository: repoId });
+    console.log(`Total commits for repo ${repoId}: ${totalCommits}`);
+    res.json({ totalCommits });
+  } catch (err) {
+    console.error("Error fetching repo commit total:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

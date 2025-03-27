@@ -150,4 +150,16 @@ router.get("/:username", async (req, res) => {
   }
 });
 
+router.get("/:username/repo/:repoId/total", async (req, res) => {
+  try {
+    const { repoId } = req.params;
+    const totalPRs = await PullRequest.countDocuments({ repository: repoId });
+    console.log(`Total PRs for repo ${repoId}: ${totalPRs}`);
+    res.json({ totalPRs });
+  } catch (err) {
+    console.error("Error fetching repo PR total:", err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 module.exports = router;

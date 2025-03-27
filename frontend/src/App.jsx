@@ -2,6 +2,7 @@ import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import Welcome from './pages/Welcome';
 import AnalysisInsights from './pages/Insights';
 import CommitsDashboard from './pages/CommitsDashboard';
+import TopRepos from './pages/TopRepos'; // Add this
 
 function App() {
   return (
@@ -11,6 +12,7 @@ function App() {
           <Route path="/" element={<Welcome />} />
           <Route path="/insights/:username" element={<AnalysisInsights />} />
           <Route path="/commits/:username" element={<CommitsDashboard />} />
+          <Route path="/top-repos/:username" element={<TopRepos />} /> {/* New route */}
         </Routes>
       </div>
     </Router>
