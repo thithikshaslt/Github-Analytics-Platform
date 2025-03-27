@@ -39,7 +39,7 @@ app.use(
       },
   })
 );
-// Repos Service Proxy
+
 app.use(
   "/repos",
   (req, res, next) => {
@@ -50,12 +50,21 @@ app.use(
     target: "http://localhost:5003",
     changeOrigin: true,
     logLevel: "debug",
+    pathRewrite: (path, req) => {
+      console.log(`Original Path: ${path}`);
+      const newPath = `/repos${path}`; 
+      console.log(`Rewritten Path: ${newPath}`);
+      return newPath;
+    },
     onProxyReq: (proxyReq, req) => {
       console.log(`Forwarding to Repos Service: ${req.method} ${req.originalUrl}`);
     },
+    onProxyRes: (proxyRes, req) => {
+      console.log(`Response from Repos Service: ${proxyRes.statusCode}`);
+    },
     onError: (err, req, res) => {
       console.error(`Proxy error for Repos Service: ${err.message}`);
-      res.status(500).json({ error: "Proxy failed" });
+      res.status(500).json({ error: "Proxy failed", details: err.message });
     },
   })
 );
@@ -71,6 +80,12 @@ app.use(
     target: "http://localhost:5004",
     changeOrigin: true,
     logLevel: "debug",
+    pathRewrite: (path, req) => {
+      console.log(`Original Path: ${path}`);
+      const newPath = `/commits${path}`; 
+      console.log(`Rewritten Path: ${newPath}`);
+      return newPath;
+  },
     onProxyReq: (proxyReq, req) => {
       console.log(`Forwarding to Commits Service: ${req.method} ${req.originalUrl}`);
     },
@@ -92,6 +107,12 @@ app.use(
     target: "http://localhost:5005",
     changeOrigin: true,
     logLevel: "debug",
+    pathRewrite: (path, req) => {
+      console.log(`Original Path: ${path}`);
+      const newPath = `/prs${path}`; 
+      console.log(`Rewritten Path: ${newPath}`);
+      return newPath;
+  },
     onProxyReq: (proxyReq, req) => {
       console.log(`Forwarding to PRs Service: ${req.method} ${req.originalUrl}`);
     },
