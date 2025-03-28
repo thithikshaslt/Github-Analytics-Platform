@@ -56,7 +56,7 @@ function TopRepos() {
     { title: 'Top 3 by Forks', sortFn: sortByForks, stat: 'forksCount', label: 'Forks' },
     { title: 'Top 3 by Commits', sortFn: sortByCommits, stat: 'commitsCount', label: 'Commits' },
     { title: 'Top 3 by PRs', sortFn: sortByPRs, stat: 'prsCount', label: 'PRs' },
-    { title: 'Top 3 by Last Updated', sortFn: sortByUpdated, stat: 'updatedAt', label: 'Last Updated' },
+    { title: 'Recently Updated', sortFn: sortByUpdated, stat: 'updatedAt', label: 'Recently Updated' },
   ];
 
   return (
