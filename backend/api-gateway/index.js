@@ -1,45 +1,66 @@
 const express = require("express");
 const { createProxyMiddleware } = require("http-proxy-middleware");
 const cors = require("cors");
+const client = require("prom-client"); // Add this
 
 const app = express();
-app.use(cors({ origin: "http://localhost:5173" })); // Allow frontend requests
+app.use(cors({ origin: "http://localhost:5173" }));
 
-const PORT = 5000; // API Gateway port
+const PORT = 5000;
 
-// Log all incoming requests
+// Collect default metrics (CPU, memory, etc.)
+client.collectDefaultMetrics();
+
+// Custom metric: HTTP requests counter
+const httpRequestsTotal = new client.Counter({
+  name: 'http_requests_total',
+  help: 'Total number of HTTP requests',
+  labelNames: ['route', 'status'],
+});
+
+// Middleware to track requests
 app.use((req, res, next) => {
   console.log(`Incoming Request: ${req.method} ${req.url}`);
+  res.on('finish', () => {
+    httpRequestsTotal.inc({ route: req.path, status: res.statusCode });
+  });
   next();
+});
+
+// Metrics endpoint for Prometheus
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', client.register.contentType);
+  res.end(await client.register.metrics());
 });
 
 // Users Service Proxy
 app.use(
   "/users",
   (req, res, next) => {
-      console.log("Before Proxy Middleware - Request received at API Gateway for User Service");
-      next();
+    console.log("Before Proxy Middleware - Request received at API Gateway for User Service");
+    next();
   },
   createProxyMiddleware({
-      target: "http://localhost:5002",
-      changeOrigin: true,
-      pathRewrite: (path, req) => {
-          console.log(`Original Path: ${path}`);
-          const newPath = `/users${path}`; 
-          console.log(`Rewritten Path: ${newPath}`);
-          return newPath;
-      },
-      logLevel: "debug",
-      onProxyReq: (proxyReq, req, res) => {
-          console.log(`Forwarding request to User Service: ${req.method} ${req.originalUrl}`);
-      },
-      onError: (err, req, res) => {
-          console.error(`Proxy error: ${err.message}`);
-          res.status(500).json({ error: "Proxy failed" });
-      },
+    target: "http://localhost:5002",
+    changeOrigin: true,
+    pathRewrite: (path, req) => {
+      console.log(`Original Path: ${path}`);
+      const newPath = `/users${path}`;
+      console.log(`Rewritten Path: ${newPath}`);
+      return newPath;
+    },
+    logLevel: "debug",
+    onProxyReq: (proxyReq, req, res) => {
+      console.log(`Forwarding request to User Service: ${req.method} ${req.originalUrl}`);
+    },
+    onError: (err, req, res) => {
+      console.error(`Proxy error: ${err.message}`);
+      res.status(500).json({ error: "Proxy failed" });
+    },
   })
 );
 
+// Repos Service Proxy
 app.use(
   "/repos",
   (req, res, next) => {
@@ -52,7 +73,7 @@ app.use(
     logLevel: "debug",
     pathRewrite: (path, req) => {
       console.log(`Original Path: ${path}`);
-      const newPath = `/repos${path}`; 
+      const newPath = `/repos${path}`;
       console.log(`Rewritten Path: ${newPath}`);
       return newPath;
     },
@@ -82,10 +103,10 @@ app.use(
     logLevel: "debug",
     pathRewrite: (path, req) => {
       console.log(`Original Path: ${path}`);
-      const newPath = `/commits${path}`; 
+      const newPath = `/commits${path}`;
       console.log(`Rewritten Path: ${newPath}`);
       return newPath;
-  },
+    },
     onProxyReq: (proxyReq, req) => {
       console.log(`Forwarding to Commits Service: ${req.method} ${req.originalUrl}`);
     },
@@ -96,7 +117,7 @@ app.use(
   })
 );
 
-// PRs Service Proxy (New)
+// PRs Service Proxy
 app.use(
   "/prs",
   (req, res, next) => {
@@ -109,10 +130,10 @@ app.use(
     logLevel: "debug",
     pathRewrite: (path, req) => {
       console.log(`Original Path: ${path}`);
-      const newPath = `/prs${path}`; 
+      const newPath = `/prs${path}`;
       console.log(`Rewritten Path: ${newPath}`);
       return newPath;
-  },
+    },
     onProxyReq: (proxyReq, req) => {
       console.log(`Forwarding to PRs Service: ${req.method} ${req.originalUrl}`);
     },
