@@ -67,7 +67,7 @@ router.get("/:username", async (req, res) => {
       return Repository.findOneAndUpdate(
         { githubId: repoData.githubId }, // Find by githubId
         repoData,                        // Update with GitHub data
-        { upsert: true, new: true }      // Insert if not found, return updated doc
+        { upsert: true, new: true,sanitizeFilter: true  }      // Insert if not found, return updated doc
       );
     });
     await Promise.all(upsertPromises);
