@@ -123,7 +123,7 @@ function TopRepos() {
                         </p>
                         <Button
                           variant="outline"
-                          onClick={() => navigate(`/intelligence/${repo.owner || username}/${repo.name}`)}
+                          onClick={() => navigate('/intelligence')}
                           className="w-full mt-3 text-xs border-[#5a329f]/60 hover:bg-[#5a329f] hover:text-white text-purple-300 transition-colors"
                         >
                           Analyze Codebase

@@ -280,7 +280,7 @@ function Insights() {
               Explore Top Repos
             </span>
             <span
-              onClick={() => navigate(`/intelligence/projects`)}
+              onClick={() => navigate('/intelligence')}
               className="text-muted-foreground hover:text-primary cursor-pointer animate-pulse"
             >
               Codebase Intelligence

@@ -1,33 +1,53 @@
-import axios from 'axios';
+const API_BASE = 'http://localhost:5000';
 
-const api = axios.create({
-  baseURL: 'http://localhost:5000',
-});
-export const getIntelligenceHealth = () => api.get('/intelligence/health');
+export async function checkIntelligenceHealth() {
+  const res = await fetch(`${API_BASE}/intelligence/health`);
+  return res.json();
+}
 
-export const registerRepository = (payload) =>
-  api.post('/intelligence/repositories', payload);
+export async function analyzeCodebaseStream(payload, onEvent, signal) {
+  const response = await fetch(`${API_BASE}/intelligence/analyze`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+    signal
+  });
 
-export const listRepositories = () =>
-  api.get('/intelligence/repositories');
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(`Server error (${response.status}): ${errorText || response.statusText}`);
+  }
 
-export const getRepository = (repoId) =>
-  api.get(`/intelligence/repositories/${repoId}`);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder('utf-8');
+  let buffer = '';
 
-export const createAnalysis = (repositoryId) =>
-  api.post('/intelligence/analyses', { repositoryId });
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
 
-export const getAnalysis = (analysisId) =>
-  api.get(`/intelligence/analyses/${analysisId}`);
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop(); // Keep unfinished line in buffer
 
-export const getLatestRepoAnalysis = (repoId) =>
-  api.get(`/intelligence/repositories/${repoId}/analyses/latest`);
+    for (const line of lines) {
+      if (line.trim()) {
+        try {
+          const parsed = JSON.parse(line.trim());
+          onEvent(parsed);
+        } catch (e) {
+          console.warn('Failed to parse stream chunk:', line);
+        }
+      }
+    }
+  }
 
-export const listRepoAnalyses = (repoId) =>
-  api.get(`/intelligence/repositories/${repoId}/analyses`);
-
-export const askCodebaseQuestion = (repositoryId, question) =>
-  api.post('/intelligence/qa', { repositoryId, question });
-
-export const listRepoQA = (repoId) =>
-  api.get(`/intelligence/repositories/${repoId}/qa`);
+  if (buffer.trim()) {
+    try {
+      const parsed = JSON.parse(buffer.trim());
+      onEvent(parsed);
+    } catch (e) {
+      // Ignored
+    }
+  }
+}

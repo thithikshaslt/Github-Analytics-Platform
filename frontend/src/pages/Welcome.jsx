@@ -16,8 +16,9 @@ function Welcome() {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center w-full dark">
-      <div className="text-center w-full max-w-md mx-auto p-6">
-        <h1 className="text-4xl text-foreground mb-6">Welcome!</h1>
+      <div className="text-center w-full max-w-md mx-auto p-6 space-y-6">
+        <h1 className="text-4xl text-foreground font-semibold tracking-tight">Welcome!</h1>
+        
         <form onSubmit={handleSubmit} className="flex gap-2">
           <Input
             value={username}
@@ -29,20 +30,21 @@ function Welcome() {
             Go
           </Button>
         </form>
-        <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-muted-foreground">
-          <span
-            onClick={() => navigate('/intelligence/local')}
-            className="hover:text-primary cursor-pointer transition-colors underline underline-offset-4"
+
+        <div className="relative flex py-1 items-center">
+          <div className="flex-grow border-t border-border"></div>
+          <span className="flex-shrink mx-4 text-xs text-muted-foreground uppercase">or</span>
+          <div className="flex-grow border-t border-border"></div>
+        </div>
+
+        <div>
+          <Button
+            onClick={() => navigate('/intelligence')}
+            variant="outline"
+            className="w-full border-border bg-card text-foreground hover:bg-accent hover:text-accent-foreground py-2"
           >
-            Analyze Local Codebase
-          </span>
-          <span className="hidden sm:inline">•</span>
-          <span
-            onClick={() => navigate('/intelligence/projects')}
-            className="hover:text-primary cursor-pointer transition-colors underline underline-offset-4"
-          >
-            Intelligence Projects
-          </span>
+            Codebase Intelligence
+          </Button>
         </div>
       </div>
     </div>

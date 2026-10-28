@@ -1,336 +1,274 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
-import {
-  BookOpen, FileText, Compass, Network, MessageSquare, Play,
-  RefreshCw, Download, ArrowLeft, CheckCircle2, AlertCircle, Layers
-} from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import {
-  registerRepository,
-  createAnalysis,
-  getAnalysis,
-  getLatestRepoAnalysis,
-  getRepository,
-  getIntelligenceHealth
-} from '@/services/intelligenceApi';
-import MarkdownViewer from '@/components/intelligence/MarkdownViewer';
+import { Input } from '@/components/ui/input';
+import { ArrowLeft, Folder, Download, Play, RefreshCw, CheckCircle2 } from 'lucide-react';
 import AnalysisProgress from '@/components/intelligence/AnalysisProgress';
-import CodebaseChat from '@/components/intelligence/CodebaseChat';
+import MarkdownViewer from '@/components/intelligence/MarkdownViewer';
+import { analyzeCodebaseStream } from '@/services/intelligenceApi';
+
+const EXCLUDE_EXTENSIONS = [
+  '.png', '.jpg', '.jpeg', '.gif', '.ico', '.svg', '.mp4', '.zip', '.tar',
+  '.gz', '.pdf', '.exe', '.bin', '.woff', '.woff2', '.ttf', '.pyc', '.lock'
+];
 
 export default function CodebaseIntelligence() {
-  const { owner, repo } = useParams();
-  const [searchParams] = useSearchParams();
-  const repoIdParam = searchParams.get('repoId');
   const navigate = useNavigate();
+  const folderInputRef = useRef(null);
 
-  const [repository, setRepository] = useState(null);
-  const [analysis, setAnalysis] = useState(null);
-  const [loadingRepo, setLoadingRepo] = useState(true);
-  const [startingAnalysis, setStartingAnalysis] = useState(false);
-  const [activeTab, setActiveTab] = useState('overview');
-  const [health, setHealth] = useState(null);
-  const pollTimerRef = useRef(null);
+  const [folderName, setFolderName] = useState('');
+  const [folderPathInput, setFolderPathInput] = useState('');
+  const [selectedFiles, setSelectedFiles] = useState([]);
+  
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [stage, setStage] = useState('');
+  const [progress, setProgress] = useState(0);
+  const [stageMessage, setStageMessage] = useState('');
+  const [error, setError] = useState(null);
+  
+  const [markdown, setMarkdown] = useState('');
+  const [analysisStats, setAnalysisStats] = useState(null);
 
-  useEffect(() => {
-    getIntelligenceHealth()
-      .then((res) => setHealth(res.data))
-      .catch(() => setHealth({ status: 'offline', ollama: { connected: false } }));
-  }, []);
+  // Handle folder chosen via browser file dialog
+  const handleFolderSelect = async (e) => {
+    const files = Array.from(e.target.files || []);
+    if (!files.length) return;
 
-  useEffect(() => {
-    const initRepo = async () => {
-      setLoadingRepo(true);
-      try {
-        let repoData = null;
-        if (repoIdParam) {
-          const res = await getRepository(repoIdParam);
-          repoData = res.data;
-        } else if (owner && repo) {
-          const res = await registerRepository({
-            sourceType: 'github',
-            fullName: `${owner}/${repo}`,
-            name: repo,
-            owner: owner,
-            cloneUrl: `https://github.com/${owner}/${repo}.git`
-          });
-          repoData = res.data;
-        }
+    // Determine root folder name
+    const samplePath = files[0].webkitRelativePath || files[0].name;
+    const rootName = samplePath.split('/')[0] || 'Repository';
+    setFolderName(rootName);
+    setFolderPathInput('');
+    setError(null);
 
-        setRepository(repoData);
-
-        if (repoData?.id) {
-          try {
-            const analysisRes = await getLatestRepoAnalysis(repoData.id);
-            setAnalysis(analysisRes.data);
-          } catch (err) {
-            setAnalysis(null);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to initialize repository:', err);
-      } finally {
-        setLoadingRepo(false);
+    // Filter text files under 200KB excluding obvious dependencies
+    const validFiles = files.filter(f => {
+      const path = (f.webkitRelativePath || f.name).replace(/\\/g, '/');
+      const lower = path.toLowerCase();
+      if (
+        lower.includes('/node_modules/') ||
+        lower.includes('/.git/') ||
+        lower.includes('/dist/') ||
+        lower.includes('/build/') ||
+        lower.includes('/.venv/') ||
+        lower.includes('/__pycache__/')
+      ) {
+        return false;
       }
-    };
-    initRepo();
-  }, [owner, repo, repoIdParam]);
+      if (EXCLUDE_EXTENSIONS.some(ext => lower.endsWith(ext))) {
+        return false;
+      }
+      if (f.size > 200 * 1024) return false;
+      return true;
+    });
 
-  useEffect(() => {
-    if (!analysis || !analysis.id) return;
+    // Read file contents
+    const readPromises = validFiles.slice(0, 100).map(async (file) => {
+      try {
+        const text = await file.text();
+        return {
+          path: file.webkitRelativePath || file.name,
+          content: text
+        };
+      } catch (err) {
+        return null;
+      }
+    });
 
-    const isRunning = ['queued', 'cloning', 'reading', 'generating'].includes(analysis.status);
-    if (isRunning) {
-      pollTimerRef.current = setInterval(async () => {
-        try {
-          const res = await getAnalysis(analysis.id);
-          setAnalysis(res.data);
-          if (res.data.status === 'completed' || res.data.status === 'failed') {
-            clearInterval(pollTimerRef.current);
-          }
-        } catch (err) {
-          console.error('Polling error:', err);
-        }
-      }, 3000);
-    }
-    return () => {
-      if (pollTimerRef.current) clearInterval(pollTimerRef.current);
-    };
-  }, [analysis?.id, analysis?.status]);
+    const loaded = (await Promise.all(readPromises)).filter(Boolean);
+    setSelectedFiles(loaded);
+  };
 
   const handleStartAnalysis = async () => {
-    if (!repository?.id || startingAnalysis) return;
-    setStartingAnalysis(true);
+    if (!selectedFiles.length && !folderPathInput.trim()) {
+      setError('Please select a local folder or enter a folder path.');
+      return;
+    }
+
+    setIsAnalyzing(true);
+    setError(null);
+    setProgress(5);
+    setStage('reading');
+    setStageMessage('Starting codebase analysis...');
+    setMarkdown('');
+    setAnalysisStats(null);
+
+    const payload = folderPathInput.trim()
+      ? { folder_path: folderPathInput.trim(), folder_name: folderPathInput.split(/[\\/]/).pop() || 'Repository' }
+      : { folder_name: folderName, files: selectedFiles };
+
     try {
-      const res = await createAnalysis(repository.id);
-      setAnalysis(res.data);
+      await analyzeCodebaseStream(payload, (event) => {
+        if (event.stage === 'error') {
+          setError(event.message || 'Analysis failed.');
+          setIsAnalyzing(false);
+          return;
+        }
+
+        setStage(event.stage);
+        setProgress(event.progress || 0);
+        setStageMessage(event.message || '');
+
+        if (event.stage === 'complete') {
+          setMarkdown(event.markdown || '');
+          setAnalysisStats(event.stats || null);
+          setIsAnalyzing(false);
+        }
+      });
     } catch (err) {
-      alert(`Could not start analysis: ${err.response?.data?.detail || err.message}`);
-    } finally {
-      setStartingAnalysis(false);
+      setError(err.message || 'Connection to intelligence service failed.');
+      setIsAnalyzing(false);
     }
   };
 
-  const handleDownloadMarkdown = () => {
-    if (!analysis) return;
-    const markdownContent = `# Codebase Intelligence & Reverse Documentation: ${repository?.fullName || 'Project'}
-
-Generated on: ${new Date().toLocaleString()}
-
----
-
-## 1. Codebase Overview
-${analysis.overview || 'N/A'}
-
----
-
-## 2. Functional Requirements Document (FRD)
-${analysis.requirements || 'N/A'}
-
----
-
-## 3. Software Design Document (SDD)
-${analysis.designDoc || 'N/A'}
-
----
-
-## 4. Architecture & Workflow Diagrams
-${analysis.diagrams || 'N/A'}
-`;
-
-    const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8;' });
+  const handleDownload = () => {
+    if (!markdown) return;
+    const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.setAttribute('download', `${(repository?.name || 'codebase')}-documentation.md`);
+    const filename = `${folderName || 'codebase'}-documentation.md`;
+    link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
-  const isAnalyzing = analysis && ['queued', 'cloning', 'reading', 'generating'].includes(analysis.status);
-
-  const tabs = [
-    { id: 'overview', label: 'Overview', icon: BookOpen },
-    { id: 'requirements', label: 'Requirements (FRD)', icon: FileText },
-    { id: 'design', label: 'Design Doc (SDD)', icon: Compass },
-    { id: 'diagrams', label: 'Diagrams (Mermaid)', icon: Network },
-    { id: 'qa', label: 'Codebase Q&A', icon: MessageSquare }
-  ];
-
   return (
-    <div className="min-h-screen bg-[#0d0a17] text-foreground p-6 md:p-8">
-      <div className="max-w-7xl mx-auto mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-[#5a329f]/30 pb-4">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="ghost"
-            onClick={() => navigate(-1)}
-            className="text-muted-foreground hover:text-white p-2 hover:bg-[#201a33]"
-          >
-            <ArrowLeft className="w-5 h-5" />
-          </Button>
+    <div className="min-h-screen bg-background text-foreground dark p-6">
+      <div className="max-w-4xl mx-auto space-y-6">
+        
+        {/* Navigation & Header */}
+        <div className="border-b border-border pb-6 space-y-3">
           <div>
-            <div className="flex items-center gap-2">
-              <Layers className="w-5 h-5 text-purple-400" />
-              <h1 className="text-xl md:text-2xl font-bold text-white">
-                {repository ? repository.fullName : 'Codebase Intelligence'}
-              </h1>
-              {repository?.sourceType && (
-                <span className="text-xs px-2 py-0.5 rounded-full font-mono bg-[#281f40] text-purple-300 border border-[#5a329f]/40 uppercase">
-                  {repository.sourceType}
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5">
-              Automated source code reverse engineering and architectural analysis
-            </p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-3">
-          {health?.ollama?.connected ? (
-            <span className="flex items-center gap-1.5 text-xs text-emerald-300 bg-emerald-950/60 border border-emerald-500/30 px-3 py-1 rounded-full">
-              <CheckCircle2 className="w-3.5 h-3.5" /> Ollama Ready ({health.ollama.configuredModel})
-            </span>
-          ) : (
-            <span className="flex items-center gap-1.5 text-xs text-amber-300 bg-amber-950/60 border border-amber-500/30 px-3 py-1 rounded-full" title="Make sure Ollama is running (`ollama serve`)">
-              <AlertCircle className="w-3.5 h-3.5" /> Ollama Offline
-            </span>
-          )}
-
-          {analysis?.status === 'completed' && (
             <Button
-              onClick={handleDownloadMarkdown}
               variant="outline"
-              className="text-xs border-[#5a329f]/50 bg-[#1c162e] hover:bg-[#2b2144] text-purple-200"
+              size="sm"
+              onClick={() => navigate('/')}
+              className="text-muted-foreground hover:text-foreground border-border flex items-center gap-2 px-3 py-1.5"
             >
-              <Download className="w-3.5 h-3.5 mr-1.5" /> Export Docs (.md)
+              <ArrowLeft className="w-4 h-4" />
+              Back
             </Button>
-          )}
-
-          <Button
-            onClick={handleStartAnalysis}
-            disabled={isAnalyzing || startingAnalysis}
-            className="bg-[#5a329f] hover:bg-[#6c3dbf] text-white text-xs px-4"
-          >
-            {isAnalyzing ? (
-              <>
-                <RefreshCw className="w-3.5 h-3.5 mr-1.5 animate-spin" /> Analyzing...
-              </>
-            ) : analysis?.status === 'completed' ? (
-              <>
-                <RefreshCw className="w-3.5 h-3.5 mr-1.5" /> Re-analyze
-              </>
-            ) : (
-              <>
-                <Play className="w-3.5 h-3.5 mr-1.5" /> Start Analysis
-              </>
-            )}
-          </Button>
-        </div>
-      </div>
-
-      <div className="max-w-7xl mx-auto">
-        {isAnalyzing && (
-          <AnalysisProgress analysis={analysis} onRetry={handleStartAnalysis} />
-        )}
-
-        {analysis?.status === 'failed' && !isAnalyzing && (
-          <AnalysisProgress analysis={analysis} onRetry={handleStartAnalysis} />
-        )}
-
-        {!analysis && !loadingRepo && !isAnalyzing && (
-          <div className="text-center py-20 px-4 rounded-2xl border border-[#5a329f]/30 bg-[#151124] shadow-xl max-w-2xl mx-auto my-12">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-[#5a329f] to-[#8b5cf6] flex items-center justify-center mx-auto mb-5 shadow-lg">
-              <Compass className="w-8 h-8 text-white" />
-            </div>
-            <h3 className="text-xl font-bold text-white mb-2">
-              Ready to Reverse-Engineer Codebase
-            </h3>
-            <p className="text-sm text-muted-foreground max-w-md mx-auto mb-6">
-              Our local AI will scan repository files, reconstruct functional specifications, architectural designs, and Mermaid workflow diagrams.
+          </div>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight text-foreground">Codebase Intelligence</h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              Reverse-engineer technical requirements and architecture using local Ollama (qwen3:8b)
             </p>
+          </div>
+        </div>
+
+        {/* Folder Selection Controls */}
+        <div className="p-5 rounded-lg border border-border bg-card space-y-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            <input
+              ref={folderInputRef}
+              type="file"
+              webkitdirectory=""
+              directory=""
+              multiple
+              onChange={handleFolderSelect}
+              className="hidden"
+            />
+            
             <Button
-              onClick={handleStartAnalysis}
-              disabled={startingAnalysis}
-              className="bg-[#5a329f] hover:bg-[#7442cc] text-white font-medium px-6 py-2.5 shadow-lg shadow-purple-900/30"
+              type="button"
+              variant="outline"
+              onClick={() => folderInputRef.current?.click()}
+              disabled={isAnalyzing}
+              className="flex items-center gap-2 border-border"
             >
-              <Play className="w-4 h-4 mr-2" /> Start Codebase Reverse Engineering
+              <Folder className="w-4 h-4 text-primary" />
+              Select Folder
+            </Button>
+
+            <div className="flex-1">
+              <Input
+                value={folderPathInput}
+                onChange={(e) => {
+                  setFolderPathInput(e.target.value);
+                  setSelectedFiles([]);
+                  setFolderName(e.target.value.split(/[\\/]/).pop() || '');
+                }}
+                disabled={isAnalyzing}
+                placeholder="Or paste local disk path (e.g. D:\projects\my-repo)"
+                className="bg-background border-border text-xs"
+              />
+            </div>
+
+            <Button
+              type="button"
+              onClick={handleStartAnalysis}
+              disabled={isAnalyzing || (!selectedFiles.length && !folderPathInput.trim())}
+              className="bg-primary text-primary-foreground hover:bg-[#4a2885] flex items-center gap-2 px-5"
+            >
+              {isAnalyzing ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  Analyzing...
+                </>
+              ) : (
+                <>
+                  <Play className="w-4 h-4" />
+                  Analyze
+                </>
+              )}
             </Button>
           </div>
+
+          {/* Folder Status Label */}
+          {folderName && (
+            <div className="text-xs text-muted-foreground flex items-center gap-2 pt-1">
+              <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+              <span>
+                Selected folder: <strong className="text-foreground">{folderName}</strong>
+                {selectedFiles.length > 0 && ` (${selectedFiles.length} source files prepared)`}
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Progress Indicator */}
+        {(isAnalyzing || error || stage === 'complete') && (
+          <AnalysisProgress
+            currentStage={stage}
+            progress={progress}
+            message={stageMessage}
+            error={error}
+          />
         )}
 
-        {analysis?.status === 'completed' && (
-          <div className="space-y-6">
-            <div className="flex border-b border-[#5a329f]/40 gap-2 overflow-x-auto pb-1">
-              {tabs.map((tab) => {
-                const Icon = tab.icon;
-                const isActive = activeTab === tab.id;
-                return (
-                  <button
-                    key={tab.id}
-                    onClick={() => setActiveTab(tab.id)}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-t-lg transition-all border-b-2 whitespace-nowrap ${
-                      isActive
-                        ? 'border-[#a78bfa] text-white bg-[#221a36]'
-                        : 'border-transparent text-muted-foreground hover:text-foreground hover:bg-[#1a142b]'
-                    }`}
-                  >
-                    <Icon className={`w-4 h-4 ${isActive ? 'text-purple-400' : 'text-muted-foreground'}`} />
-                    {tab.label}
-                  </button>
-                );
-              })}
+        {/* Generated Markdown Document & Download */}
+        {markdown && (
+          <div className="rounded-lg border border-border bg-card p-6 shadow-sm space-y-4">
+            <div className="flex items-center justify-between border-b border-border pb-3">
+              <div>
+                <h2 className="text-lg font-semibold text-foreground">Generated Documentation</h2>
+                {analysisStats && (
+                  <p className="text-xs text-muted-foreground">
+                    Analyzed {analysisStats.analyzed_files} files from {analysisStats.folder_name}
+                    {analysisStats.truncated && ' (representative architectural subset)'}
+                  </p>
+                )}
+              </div>
+              <Button
+                onClick={handleDownload}
+                size="sm"
+                className="bg-primary text-primary-foreground hover:bg-[#4a2885] flex items-center gap-2"
+              >
+                <Download className="w-4 h-4" />
+                Download Markdown
+              </Button>
             </div>
 
-            <div className="bg-[#141022] rounded-xl border border-[#5a329f]/30 p-6 md:p-8 shadow-xl min-h-[500px]">
-              {activeTab === 'overview' && (
-                <div>
-                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                    <BookOpen className="w-5 h-5 text-purple-400" />
-                    Codebase Overview & Architecture Summary
-                  </h3>
-                  <MarkdownViewer content={analysis.overview} />
-                </div>
-              )}
-
-              {activeTab === 'requirements' && (
-                <div>
-                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                    <FileText className="w-5 h-5 text-purple-400" />
-                    Functional Requirements Document (FRD)
-                  </h3>
-                  <MarkdownViewer content={analysis.requirements} />
-                </div>
-              )}
-
-              {activeTab === 'design' && (
-                <div>
-                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                    <Compass className="w-5 h-5 text-purple-400" />
-                    Software Design Document (SDD)
-                  </h3>
-                  <MarkdownViewer content={analysis.designDoc} />
-                </div>
-              )}
-
-              {activeTab === 'diagrams' && (
-                <div>
-                  <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                    <Network className="w-5 h-5 text-purple-400" />
-                    Workflow & Architectural Diagrams (Mermaid)
-                  </h3>
-                  <MarkdownViewer content={analysis.diagrams} />
-                </div>
-              )}
-
-              {activeTab === 'qa' && (
-                <div>
-                  <CodebaseChat repositoryId={repository?.id} />
-                </div>
-              )}
+            <div className="pt-2">
+              <MarkdownViewer content={markdown} />
             </div>
           </div>
         )}
+
       </div>
     </div>
   );
