@@ -60,11 +60,9 @@ def parse_and_validate_github_url(raw_url: str) -> tuple[str, str, str]:
     except Exception:
         raise ValueError("Invalid URL format.")
 
-    # 1. Strict HTTPS scheme
     if parsed.scheme.lower() != "https":
         raise ValueError("Only secure HTTPS GitHub URLs are supported (e.g. https://github.com/owner/repository).")
 
-    # 2. Strict github.com host (no other hosts, no user/password, no custom port)
     hostname = (parsed.hostname or "").lower()
     if hostname != "github.com":
         raise ValueError("Only repositories hosted on github.com are supported.")
@@ -74,14 +72,10 @@ def parse_and_validate_github_url(raw_url: str) -> tuple[str, str, str]:
 
     if parsed.port is not None:
         raise ValueError("Custom ports in GitHub URLs are not permitted.")
-
-    # 3. Disallow query parameters and URL fragments
     if parsed.query:
         raise ValueError("Query parameters are not permitted in GitHub repository URLs.")
     if parsed.fragment:
         raise ValueError("URL fragments are not permitted in GitHub repository URLs.")
-
-    # 4. Path segmentation and validation
     path = parsed.path.strip("/")
     segments = [s for s in path.split("/") if s]
 
@@ -92,8 +86,6 @@ def parse_and_validate_github_url(raw_url: str) -> tuple[str, str, str]:
 
     owner = segments[0]
     raw_repo = segments[1]
-
-    # Strip optional .git suffix
     if raw_repo.lower().endswith(".git"):
         repo = raw_repo[:-4]
     else:
@@ -250,7 +242,6 @@ async def analysis_stream_generator(req: AnalyzeRequest):
         raw_files = []
 
         if req.github_url:
-            # Stage: validating
             yield json.dumps({
                 "stage": "validating",
                 "message": "Validating GitHub URL...",
@@ -261,7 +252,6 @@ async def analysis_stream_generator(req: AnalyzeRequest):
             canonical_url, owner, repo = parse_and_validate_github_url(req.github_url)
             folder_name = repo
 
-            # Stage: cloning
             yield json.dumps({
                 "stage": "cloning",
                 "message": f"Cloning {owner}/{repo} (shallow clone)...",
@@ -274,7 +264,6 @@ async def analysis_stream_generator(req: AnalyzeRequest):
             await asyncio.to_thread(clone_github_repo, canonical_url, temp_dir)
             await asyncio.to_thread(check_cloned_repo_limits, temp_dir)
 
-            # Stage: reading
             yield json.dumps({
                 "stage": "reading",
                 "message": "Reading files...",
@@ -285,7 +274,6 @@ async def analysis_stream_generator(req: AnalyzeRequest):
             _, raw_files = read_files_from_disk(temp_dir)
 
         elif req.folder_path:
-            # Stage 1: Reading files
             yield json.dumps({
                 "stage": "reading",
                 "message": "Reading files...",

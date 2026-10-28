@@ -53,7 +53,6 @@ export default function AnalysisProgress({ currentStage, progress = 0, message =
         </span>
       </div>
 
-      {/* Progress Bar */}
       <div className="w-full bg-muted rounded-full h-2 mb-4 overflow-hidden">
         <div
           className={`h-2 transition-all duration-300 rounded-full ${
@@ -63,7 +62,6 @@ export default function AnalysisProgress({ currentStage, progress = 0, message =
         />
       </div>
 
-      {/* Stages Row */}
       <div className="flex justify-between items-center text-xs text-muted-foreground pt-1 border-t border-border/50">
         {stages.map((s) => {
           const status = getStageStatus(s.key);

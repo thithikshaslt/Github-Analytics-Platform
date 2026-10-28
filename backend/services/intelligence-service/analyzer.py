@@ -7,16 +7,9 @@ from config import settings
 
 logger = logging.getLogger(__name__)
 
-EXCLUDED_DIRS = {
-    "node_modules", ".git", ".github", "__pycache__", ".venv", "venv",
-    "env", ".next", "dist", "build", "coverage", ".pytest_cache", ".idea", ".vscode"
-}
+EXCLUDED_DIRS = {"node_modules", ".git", ".github", "__pycache__", ".venv", "venv", "env", ".next", "dist", "build", ".pytest_cache", ".idea", ".vscode"}
 
-EXCLUDED_EXTENSIONS = {
-    ".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".mp4", ".zip", ".tar",
-    ".gz", ".pdf", ".exe", ".bin", ".woff", ".woff2", ".ttf", ".eot", ".pyc",
-    ".lock", ".map", ".min.js", ".min.css"
-}
+EXCLUDED_EXTENSIONS = {".png", ".jpg", ".jpeg", ".gif", ".ico", ".svg", ".mp4", ".zip", ".tar",".gz", ".pdf", ".exe", ".bin", ".pyc",".lock", ".min.js", ".min.css"}
 
 def is_text_file(filename: str) -> bool:
     ext = Path(filename).suffix.lower()
@@ -44,7 +37,7 @@ def filter_and_format_files(files: list[dict], max_chars: int = 35000) -> tuple[
         p_lower = path.lower()
         if "readme" in p_lower:
             return 0
-        if any(k in p_lower for k in ["package.json", "requirements.txt", "cargo.toml", "go.mod"]):
+        if any(k in p_lower for k in ["package.json", "requirements.txt"]):
             return 1
         if any(k in p_lower for k in ["main", "index", "app", "server"]):
             return 2
