@@ -29,6 +29,21 @@ function Welcome() {
             Go
           </Button>
         </form>
+        <div className="mt-6 flex flex-col sm:flex-row items-center justify-center gap-3 text-xs text-muted-foreground">
+          <span
+            onClick={() => navigate('/intelligence/local')}
+            className="hover:text-primary cursor-pointer transition-colors underline underline-offset-4"
+          >
+            Analyze Local Codebase
+          </span>
+          <span className="hidden sm:inline">•</span>
+          <span
+            onClick={() => navigate('/intelligence/projects')}
+            className="hover:text-primary cursor-pointer transition-colors underline underline-offset-4"
+          >
+            Intelligence Projects
+          </span>
+        </div>
       </div>
     </div>
   );
