@@ -17,8 +17,9 @@ export default function CodebaseIntelligence() {
   const folderInputRef = useRef(null);
 
   const [folderName, setFolderName] = useState('');
-  const [folderPathInput, setFolderPathInput] = useState('');
+  const [githubUrl, setGithubUrl] = useState('');
   const [selectedFiles, setSelectedFiles] = useState([]);
+  const [isGithubMode, setIsGithubMode] = useState(false);
   
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [stage, setStage] = useState('');
@@ -34,12 +35,14 @@ export default function CodebaseIntelligence() {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
 
+    // Clear any entered GitHub URL
+    setGithubUrl('');
+    setError(null);
+
     // Determine root folder name
     const samplePath = files[0].webkitRelativePath || files[0].name;
     const rootName = samplePath.split('/')[0] || 'Repository';
     setFolderName(rootName);
-    setFolderPathInput('');
-    setError(null);
 
     // Filter text files under 200KB excluding obvious dependencies
     const validFiles = files.filter(f => {
@@ -80,21 +83,31 @@ export default function CodebaseIntelligence() {
   };
 
   const handleStartAnalysis = async () => {
-    if (!selectedFiles.length && !folderPathInput.trim()) {
-      setError('Please select a local folder or enter a folder path.');
+    const trimmedUrl = githubUrl.trim();
+    if (!selectedFiles.length && !trimmedUrl) {
+      setError('Please select a local folder or enter a public GitHub repository URL.');
       return;
     }
 
+    const isGithub = Boolean(trimmedUrl);
+    setIsGithubMode(isGithub);
     setIsAnalyzing(true);
     setError(null);
-    setProgress(5);
-    setStage('reading');
-    setStageMessage('Starting codebase analysis...');
     setMarkdown('');
     setAnalysisStats(null);
 
-    const payload = folderPathInput.trim()
-      ? { folder_path: folderPathInput.trim(), folder_name: folderPathInput.split(/[\\/]/).pop() || 'Repository' }
+    if (isGithub) {
+      setStage('validating');
+      setProgress(5);
+      setStageMessage('Validating GitHub URL...');
+    } else {
+      setStage('reading');
+      setProgress(20);
+      setStageMessage('Starting codebase analysis...');
+    }
+
+    const payload = isGithub
+      ? { github_url: trimmedUrl }
       : { folder_name: folderName, files: selectedFiles };
 
     try {
@@ -112,6 +125,9 @@ export default function CodebaseIntelligence() {
         if (event.stage === 'complete') {
           setMarkdown(event.markdown || '');
           setAnalysisStats(event.stats || null);
+          if (event.stats?.folder_name) {
+            setFolderName(event.stats.folder_name);
+          }
           setIsAnalyzing(false);
         }
       });
@@ -186,14 +202,17 @@ export default function CodebaseIntelligence() {
 
             <div className="flex-1">
               <Input
-                value={folderPathInput}
+                value={githubUrl}
                 onChange={(e) => {
-                  setFolderPathInput(e.target.value);
+                  setGithubUrl(e.target.value);
                   setSelectedFiles([]);
-                  setFolderName(e.target.value.split(/[\\/]/).pop() || '');
+                  setFolderName('');
+                  if (folderInputRef.current) {
+                    folderInputRef.current.value = '';
+                  }
                 }}
                 disabled={isAnalyzing}
-                placeholder="Or paste local disk path (e.g. D:\projects\my-repo)"
+                placeholder="Paste public GitHub repository URL (e.g. https://github.com/owner/repository)"
                 className="bg-background border-border text-xs"
               />
             </div>
@@ -201,7 +220,7 @@ export default function CodebaseIntelligence() {
             <Button
               type="button"
               onClick={handleStartAnalysis}
-              disabled={isAnalyzing || (!selectedFiles.length && !folderPathInput.trim())}
+              disabled={isAnalyzing || (!selectedFiles.length && !githubUrl.trim())}
               className="bg-primary text-primary-foreground hover:bg-[#4a2885] flex items-center gap-2 px-5"
             >
               {isAnalyzing ? (
@@ -219,12 +238,12 @@ export default function CodebaseIntelligence() {
           </div>
 
           {/* Folder Status Label */}
-          {folderName && (
+          {folderName && selectedFiles.length > 0 && (
             <div className="text-xs text-muted-foreground flex items-center gap-2 pt-1">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
               <span>
                 Selected folder: <strong className="text-foreground">{folderName}</strong>
-                {selectedFiles.length > 0 && ` (${selectedFiles.length} source files prepared)`}
+                {` (${selectedFiles.length} source files prepared)`}
               </span>
             </div>
           )}
@@ -237,6 +256,7 @@ export default function CodebaseIntelligence() {
             progress={progress}
             message={stageMessage}
             error={error}
+            isGithub={isGithubMode}
           />
         )}
 

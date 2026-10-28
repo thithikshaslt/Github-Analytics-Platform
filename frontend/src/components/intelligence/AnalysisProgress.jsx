@@ -1,7 +1,7 @@
 import React from 'react';
 import { Loader2, CheckCircle2, AlertCircle } from 'lucide-react';
 
-const STAGES = [
+const LOCAL_STAGES = [
   { key: 'reading', label: 'Reading files' },
   { key: 'context', label: 'Preparing context' },
   { key: 'analyzing', label: 'Analyzing with Ollama' },
@@ -9,10 +9,24 @@ const STAGES = [
   { key: 'complete', label: 'Complete' }
 ];
 
-export default function AnalysisProgress({ currentStage, progress = 0, message = '', error = null }) {
+const GITHUB_STAGES = [
+  { key: 'validating', label: 'Validating GitHub URL' },
+  { key: 'cloning', label: 'Cloning repository' },
+  { key: 'reading', label: 'Reading files' },
+  { key: 'context', label: 'Preparing context' },
+  { key: 'analyzing', label: 'Analyzing with Ollama' },
+  { key: 'generating', label: 'Generating document' },
+  { key: 'complete', label: 'Complete' }
+];
+
+export default function AnalysisProgress({ currentStage, progress = 0, message = '', error = null, isGithub = false }) {
+  const stages = (isGithub || currentStage === 'validating' || currentStage === 'cloning')
+    ? GITHUB_STAGES
+    : LOCAL_STAGES;
+
   const getStageStatus = (key) => {
     if (error) return 'error';
-    const keys = STAGES.map(s => s.key);
+    const keys = stages.map(s => s.key);
     const currentIndex = keys.indexOf(currentStage);
     const stageIndex = keys.indexOf(key);
 
@@ -51,7 +65,7 @@ export default function AnalysisProgress({ currentStage, progress = 0, message =
 
       {/* Stages Row */}
       <div className="flex justify-between items-center text-xs text-muted-foreground pt-1 border-t border-border/50">
-        {STAGES.map((s) => {
+        {stages.map((s) => {
           const status = getStageStatus(s.key);
           return (
             <div
