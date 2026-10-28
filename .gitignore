@@ -130,3 +130,15 @@ dist
 .pnp.*
 
 keys/
+
+# Python & Intelligence Service
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+*.env
+!backend/services/*/.env.example
+data/snapshots/
+backend/services/intelligence-service/data/

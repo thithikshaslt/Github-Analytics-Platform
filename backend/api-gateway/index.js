@@ -1,24 +1,21 @@
 const express = require("express");
 const { createProxyMiddleware } = require("http-proxy-middleware");
 const cors = require("cors");
-const client = require("prom-client"); // Add this
+const client = require("prom-client"); 
 
 const app = express();
 app.use(cors({ origin: "http://localhost:5173" }));
 
 const PORT = 5000;
 
-// Collect default metrics (CPU, memory, etc.)
 client.collectDefaultMetrics();
 
-// Custom metric: HTTP requests counter
 const httpRequestsTotal = new client.Counter({
   name: 'http_requests_total',
   help: 'Total number of HTTP requests',
   labelNames: ['route', 'status'],
 });
 
-// Middleware to track requests
 app.use((req, res, next) => {
   console.log(`Incoming Request: ${req.method} ${req.url}`);
   res.on('finish', () => {
@@ -27,7 +24,6 @@ app.use((req, res, next) => {
   next();
 });
 
-// Metrics endpoint for Prometheus
 app.get('/metrics', async (req, res) => {
   res.set('Content-Type', client.register.contentType);
   res.end(await client.register.metrics());
@@ -143,6 +139,34 @@ app.use(
     },
   })
 );
+
+// Intelligence service proxy
+app.use(
+  "/intelligence",
+  (req, res, next) => {
+    console.log("Before Proxy - Request received for Intelligence Service");
+    next();
+  },
+  createProxyMiddleware({
+    target: "http://localhost:5006",
+    changeOrigin: true,
+    logLevel: "debug",
+    pathRewrite: (path, req) => {
+      console.log(`Original path: ${path}`);
+      const newPath =`/intelligence${path}`;
+      console.log(`Rewritten path: ${newPath}`);
+      return newPath;
+    },
+    onProxyReq: (proxyReq, req) => {
+      console.log(`Forwarding to Intelligence Service: ${req.method} ${req.originalUrl}`);
+    },
+    onError: (err, req, res) => {
+      console.error(`Proxy error for Intelligence Service: ${err.message}`);
+      res.status(500).json({ error: "Proxy failed" });
+    },
+  })
+);
+
 
 app.listen(PORT, () => {
   console.log(`API Gateway is running on port ${PORT}`);
